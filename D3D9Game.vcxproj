@@ -207,6 +207,9 @@
     <ClInclude Include="ModelMD5.h" />
     <ClInclude Include="Parser.h" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="HLSLMain.fx" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
