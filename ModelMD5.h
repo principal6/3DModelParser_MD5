@@ -15,6 +15,10 @@
 #define MAX_MESH_INDICES	9000		// 모델 - 메쉬별 최대 색인 개수		14238
 #define MAX_MESH_WEIGHTS	10000		// 모델 - 메쉬별 최대 가중치 개수	18013
 
+#define MAX_VERTICES		30000		// 모델 - 최대 정점 개수
+#define MAX_INDICES			40000		// 모델 - 최대 색인 개수
+#define MAX_WEIGHTS			50000		// 모델 - 최대 가중치 개수
+
 #define MAX_ANIMATIONS		10			// 모델 - 애니메이션 최대 개수
 #define MAX_FRAMES			160			// 모델 - 애니메이션 최대 프레임
 
@@ -25,21 +29,32 @@ typedef char KEYWORD[MAX_KEYWORD_LEN];	// 키워드 저장용 변수 유형
 
 
 // 정점 구조체 선언 - 위치(Position), 텍스처 좌표(Texture Coordinates), 법선 벡터(Normal) //
-struct ANYVERTEX	// 위치 -> 법선 -> 텍스처 순서를 반드시 지켜야 함!★★★
+struct VERTEX_MD5	// 위치 -> 법선 -> 텍스처 순서를 반드시 지켜야 함!★★★
 {
-	XMFLOAT3 pos;
-	XMFLOAT3 normal;
-	XMFLOAT2 texCoord;
+	XMFLOAT3 Position;
+	XMFLOAT3 Normal;
+	XMFLOAT2 Texture;
 };
 
-#define D3DFVF_ANYVERTEX (D3DFVF_XYZ | D3DFVF_NORMAL | D3DFVF_TEX1)
+struct VERTEX_MD5_BB
+{
+	XMFLOAT3 Position;
+};
 
-struct ANYINDEX
+#define D3DFVF_VERTEX_MD5 (D3DFVF_XYZ | D3DFVF_NORMAL | D3DFVF_TEX1)
+#define D3DFVF_VERTEX_MD5_BB (D3DFVF_XYZ)
+
+struct INDEX_MD5
 {
 	WORD _0, _1, _2;
 };
 
-struct MD5Joint
+struct INDEX_MD5_BB
+{
+	WORD _0, _1;
+};
+
+struct Joint_MD5
 {
 	ANYNAME		Name;
 	int			ParentID;
@@ -47,7 +62,7 @@ struct MD5Joint
 	XMFLOAT4	Orientation;
 };
 
-struct MD5Weight
+struct Weight_MD5
 {
 	int			JointID;
 	float		Bias;
@@ -55,50 +70,53 @@ struct MD5Weight
 	XMFLOAT3	Normal;
 };
 
-struct MD5Object	// 최신 버전
+struct Object_MD5	// 최신 버전
 {
 	ANYNAME		Name;
 	int			ObjectID;
 	int			numMeshes;
 };
 
-struct MD5Material	// 최신 버전
+struct Material_MD5	// 최신 버전
 {
 	ANYNAME		Name;
 	ANYNAME		TextureFileName;
 };
 
-struct MD5Mesh
-{
-	ANYNAME		MaterialName;	// 최신 버전이면 Material의 이름이, 구버전이면 Texture 파일명이 들어 있다.
-
-	ANYVERTEX	Vertices[MAX_MESH_VERTICES];
-	int			VertexWeightStart[MAX_MESH_VERTICES];
-	int			VertexNumWeights[MAX_MESH_VERTICES];
-
-	ANYINDEX	Indices[MAX_MESH_INDICES];
-
-	MD5Weight	Weights[MAX_MESH_WEIGHTS];
-};
-
-struct MD5BoundingBox
+struct BoundingBox_MD5
 {
 	XMFLOAT3	Min;
 	XMFLOAT3	Max;
 };
 
-struct MD5Frame
+struct Mesh_MD5
+{
+	ANYNAME		MaterialName;	// 최신 버전이면 Material의 이름이, 구버전이면 Texture 파일명이 들어 있다.
+
+	VERTEX_MD5	Vertices[MAX_MESH_VERTICES];
+	int			VertexWeightStart[MAX_MESH_VERTICES];
+	int			VertexNumWeights[MAX_MESH_VERTICES];
+
+	INDEX_MD5	Indices[MAX_MESH_INDICES];
+
+	Weight_MD5	Weights[MAX_MESH_WEIGHTS];
+
+	BoundingBox_MD5	BB;
+	BoundingBox_MD5	BB_Animed;
+};
+
+struct Frame_MD5
 {
 	int			FrameID;
 	float		JointData[MAX_JOINTS*6];
 };
 
-struct MD5FrameSkeleton
+struct FrameSkeleton_MD5
 {
-	MD5Joint	Skeleton[MAX_JOINTS];
+	Joint_MD5	Skeleton[MAX_JOINTS];
 };
 
-struct MD5AnimationJointInfo
+struct AnimationJointInfo_MD5
 {
 	ANYNAME		Name;
 	int			ParentID;
@@ -106,7 +124,7 @@ struct MD5AnimationJointInfo
 	int			StartIndex;
 };
 
-struct MD5Animation
+struct Animation_MD5
 {
 	int		numFrames;
 	int		numJoints;
@@ -118,14 +136,14 @@ struct MD5Animation
 
 	float	BasicAnimSpeed;
 
-	MD5AnimationJointInfo	JointInfo[MAX_JOINTS];
-	MD5BoundingBox			BoundingBoxes[MAX_FRAMES];
-	MD5Joint				JointBaseFrame[MAX_JOINTS];
-	MD5Frame				FrameData[MAX_FRAMES];
-	MD5FrameSkeleton		FrameSekelton[MAX_FRAMES];
+	AnimationJointInfo_MD5	JointInfo[MAX_JOINTS];
+	BoundingBox_MD5			BoundingBoxes[MAX_FRAMES];
+	Joint_MD5				JointBaseFrame[MAX_JOINTS];
+	Frame_MD5				FrameData[MAX_FRAMES];
+	FrameSkeleton_MD5		FrameSekelton[MAX_FRAMES];
 };
 
-struct MD5Instance
+struct Instance_MD5
 {
 	XMFLOAT3	Translation;
 	XMFLOAT3	Rotation;
@@ -133,12 +151,16 @@ struct MD5Instance
 
 	int			CurAnimID;
 	float		CurAnimTime;
+	bool		BeingAnimated;
 };
 
 // MD5 모델 클래스
 class ModelMD5 {
 public:
-	int						MD5Version;
+	ModelMD5();
+	~ModelMD5();
+
+	int						Version_MD5;
 
 	int						numMeshes;
 	int						numMeshVertices[MAX_MESHES];
@@ -146,10 +168,10 @@ public:
 	int						numWeights[MAX_MESHES];
 
 	int						TotalAnimCount;
-	MD5Animation			ModelAnimation[MAX_ANIMATIONS];
+	Animation_MD5			ModelAnimation[MAX_ANIMATIONS];
 
 	int						numInstances;
-	MD5Instance				ModelInstances[MAX_INSTANCES];
+	Instance_MD5			ModelInstances[MAX_INSTANCES];
 	
 	char					BaseDir[MAX_NAME_LEN];
 	void ModelMD5::SetBaseDirection(char* Dir);
@@ -157,6 +179,7 @@ public:
 	LPDIRECT3DTEXTURE9		ModelTextures[MAX_MATERIALS];
 	bool ModelMD5::CreateModel(LPDIRECT3DDEVICE9 D3DDevice, char* BaseDir, char* FileNameWithoutExtension);
 		bool ModelMD5::OpenMeshFromFile(char* FileName);
+	void ModelMD5::CreateMeshBoundingBoxes();
 
 	bool ModelMD5::CreateAnimation(int AnimationID, char* AnimationFileName, float AnimationSpeed);
 		bool ModelMD5::OpenAnimationFromFile(int AnimationID, char* FileName);
@@ -167,7 +190,7 @@ public:
 	void ModelMD5::SetInstance(int InstanceID, XMFLOAT3 Translation, XMFLOAT3 Rotation, XMFLOAT3 Scaling);
 
 	void ModelMD5::DrawModel(LPDIRECT3DDEVICE9 D3DDevice);
-	void ModelMD5::Destroy();
+	void ModelMD5::DrawBoundingBoxes(LPDIRECT3DDEVICE9 D3DDevice, int InstanceID);
 
 	HRESULT ModelMD5::SetTexture(LPDIRECT3DDEVICE9 D3DDevice, int MeshIndex);
 	HRESULT ModelMD5::UpdateVertices(LPDIRECT3DDEVICE9 D3DDevice, int MeshIndex);
