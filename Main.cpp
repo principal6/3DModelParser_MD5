@@ -3,9 +3,10 @@
 #include "DirectInput.h"
 #include "Camera.h"
 #include "Font.h"
+#include "Grid.h"
 #include <crtdbg.h>
 
-#ifdef _DEBUG	// 메모리 누수 검사
+#ifdef _DEBUG		// 디버그 모드 메모리 누수 검사★
 #define new new( _CLIENT_BLOCK, __FILE, __LINE__)
 #endif
 
@@ -23,31 +24,17 @@ LPDIRECT3D9             g_pD3D				= NULL;
 LPDIRECT3DDEVICE9       g_pd3dDevice		= NULL;
 LPD3DXEFFECT			g_pHLSL				= NULL;	// HLSL Shader
 
-LPDIRECT3DVERTEXBUFFER9	g_pModelVB			= NULL;
-LPDIRECT3DINDEXBUFFER9	g_pModelIB			= NULL;
-LPDIRECT3DVERTEXBUFFER9	g_pModelInstanceVB	= NULL;
-
-LPDIRECT3DVERTEXBUFFER9	g_pBBVB				= NULL;
-LPDIRECT3DINDEXBUFFER9	g_pBBIB				= NULL;
-
-LPDIRECT3DVERTEXBUFFER9	g_pNVVB				= NULL;
-LPDIRECT3DINDEXBUFFER9	g_pNVIB				= NULL;
-
 DirectCamera9			g_Camera;					// Direct Camera
 DirectFont9				g_Font;						// Direct Font
+DirectGrid9				g_Grid;						// Direct Grid
 
 DirectInput*			g_pDI				= NULL;	// Direct Input
 D3DXVECTOR3				MouseState;					// Direct Input - 마우스 이동, 휠
 POINT					MouseScreen;				// Direct Input - 마우스 좌표
 int						MouseButtonState	= 0;	// Direct Input - 마우스 버튼 눌림
 
-D3DXMATRIXA16			matView, matProj;
-D3DXMATRIXA16			matVP;
-
-
 // 기타 변수 선언
-DWORD					Timer_App			= 0;
-DWORD					Timer_Animation		= 0;
+ULONGLONG				Timer_App			= 0;
 int						FPS					= 0;
 int						FPS_Shown			= 0;
 
@@ -61,8 +48,6 @@ bool					bWireFrame			= false;
 VOID Cleanup();
 HRESULT InitD3D( HWND hWnd, HINSTANCE hInst );
 HRESULT InitModel();
-VOID SetupCameraMatrices();
-VOID SetupLights();
 VOID Render();
 LRESULT WINAPI MsgProc( HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam );
 INT WINAPI WinMain( HINSTANCE hInst, HINSTANCE, LPSTR, INT );
@@ -95,11 +80,16 @@ HRESULT InitD3D( HWND hWnd, HINSTANCE hInst )
 
 	InitModel();
 
+	g_Grid.SetDevice(g_pd3dDevice);
+	g_Grid.AddGridXZ(1, 50, 100);
+	g_Grid.CreateGrid();
+
 	g_pDI = DirectInput::GetInstance();		// Direct Input 초기화
 	g_pDI->InitDirectInput(hInst, hWnd);
 	g_pDI->CreateKeyboardDevice(DISCL_BACKGROUND|DISCL_NONEXCLUSIVE);
 	g_pDI->CreateMouseDevice(DISCL_BACKGROUND|DISCL_NONEXCLUSIVE);
 
+	g_Camera.SetDevice(g_pd3dDevice);
 	g_Camera.SetCamera_FreeLook(-5.0f, 4.0f, -5.0f);
 	
 	g_Font.CreateFontA(g_pd3dDevice, "Arial", 20, false, ScreenWidth, ScreenHeight);
@@ -110,34 +100,23 @@ HRESULT InitD3D( HWND hWnd, HINSTANCE hInst )
 HRESULT InitModel()
 {
 	// 모델 생성
-	MyMD5Model[0].CreateModel(g_pd3dDevice, "Model\\", "Ezreal");
-		MyMD5Model[0].AddAnimation(0, "EzrealIdle", 0.02f);
-		MyMD5Model[0].AddAnimation(1, "EzrealWalk", 0.02f);
-		MyMD5Model[0].AddAnimation(2, "EzrealPunching", 0.02f);
-		MyMD5Model[0].AddAnimation(3, "EzrealStanding1HMagicAttack01", 0.02f);
-	MyMD5Model[0].CreateAnimationJointTexture(g_pd3dDevice, g_pHLSL);
-	MyMD5Model[0].CreateAnimationWeightTexture(g_pd3dDevice, g_pHLSL);
+	MyMD5Model[0].CreateModel(g_pd3dDevice, "Model\\", "Ezreal", g_pHLSL);
+	MyMD5Model[0].HLSLInstancing = false;
+
+	MyMD5Model[0].AddAnimation(0, "EzrealIdle", 0.02f);
+	MyMD5Model[0].AddAnimation(1, "EzrealWalk", 0.02f);
+	MyMD5Model[0].AddAnimation(2, "EzrealPunching", 0.02f);
+	MyMD5Model[0].AddAnimation(3, "EzrealStanding1HMagicAttack01", 0.02f);
+	MyMD5Model[0].AddAnimationEnd();
 
 	// 모델 인스턴스 설정
-	for (int i = 0; i < 30; i++)
-	{
-		MyMD5Model[0].AddInstance( XMFLOAT3((float)((int)(i % 10) * 6), -4.0f, (float)(int)(i / 10) * 8),
-			XMFLOAT3(0.0f, 0.0f, 0.0f), XMFLOAT3(0.1f, 0.1f, 0.1f) );
-		MyMD5Model[0].SetInstanceAnimation(i, i % 4, 0.0f);	// 애니메이션 시작 시간 0으로 초기화
-	}
-	MyMD5Model[0].CreateInstanceBuffer(g_pd3dDevice);
+	MyMD5Model[0].AddInstance( XMFLOAT3(1, -4.0f, 0), XMFLOAT3(0.0f, 0.0f, 0.0f), XMFLOAT3(0.1f, 0.1f, 0.1f) );
+	MyMD5Model[0].AddInstance( XMFLOAT3(10, -4.0f, 0), XMFLOAT3(0.0f, 0.0f, 0.0f), XMFLOAT3(0.1f, 0.1f, 0.1f) );
+	MyMD5Model[0].SetInstanceAnimation(0, 1, 0.0f);	// 애니메이션 시작 시간 0으로 초기화
+	MyMD5Model[0].SetInstanceAnimation(1, 2, 0.0f);	// 애니메이션 시작 시간 0으로 초기화
+	MyMD5Model[0].AddInstanceEnd();
 
 	return S_OK;
-}
-
-VOID SetupCameraMatrices()
-{
-	// 뷰 행렬(카메라 설정)
-	g_Camera.UseCamera_FreeLook( g_pd3dDevice, &matView );
-	
-	// 투영 행렬(원근감 설정)
-	D3DXMatrixPerspectiveFovLH( &matProj, D3DX_PI/4, 1.0f, 1.0f, 10000.0f );
-	g_pd3dDevice->SetTransform( D3DTS_PROJECTION, &matProj );
 }
 
 void DetectInput(HWND hWnd)
@@ -248,30 +227,36 @@ VOID Render()
 
 	if( SUCCEEDED( g_pd3dDevice->BeginScene() ) )
 	{
-		SetupCameraMatrices();
+		// 카메라 설정
+		g_Camera.UseCamera_FreeLook();
+		g_Camera.SetProjection(10000.0f);
+		
+		// 조명 기능 (HLSL 안 쓸 때는 지정해 주어야 함!!!)
+		g_pd3dDevice->SetRenderState( D3DRS_LIGHTING, FALSE );
 
-		matVP	= matView * matProj;
-		g_pHLSL->SetMatrix("matVP", &matVP);
+		g_Grid.DrawGrid();
 
 		// 모델 인스턴스 정보 갱신
 		for (int i = 0; i < MyMD5Model[0].numInstances; i++)
 		{
-			MyMD5Model[0].InstanceAnimate(i, 0.0f);
-			MyMD5Model[0].UpdateModelBoundingBox();
+			MyMD5Model[0].AnimateInstance(i, 0.0f);
+			//MyMD5Model[0].DrawNonHLSL(i, g_Camera.GetViewMatrix(), g_Camera.GetProjectionMatrix());
+			MyMD5Model[0].DrawHLSL(i, g_Camera.GetViewMatrix(), g_Camera.GetProjectionMatrix());
 		}
-		MyMD5Model[0].UpdateInstanceBuffer(g_pd3dDevice);
+		//MyMD5Model[0].DrawHLSLInstancing(g_Camera.GetViewMatrix(), g_Camera.GetProjectionMatrix());
+		
+		if (bDrawBoundingBoxes)
+			MyMD5Model[0].DrawBoundingBoxes();
 
-		// HLSL 그리기
-		MyMD5Model[0].DrawModel_HLSL(g_pd3dDevice, g_pHLSL);
-
-		if (bDrawBoundingBoxes == true)
-			MyMD5Model[0].DrawBoundingBoxes_HLSL(g_pd3dDevice, g_pHLSL);
+		if (bDrawNormalVectors)
+			MyMD5Model[0].DrawNormalVecters(2.0f);
 
 		if (g_pDI->OnMouseButtonDown(0))
 		{
 			for (int i = 0; i < MyMD5Model[0].numInstances; i++)
 			{
-				MyMD5Model[0].CheckMouseOverPerInstance(g_pd3dDevice, i, MouseScreen.x, MouseScreen.y, ScreenWidth, ScreenHeight, matView, matProj);
+				MyMD5Model[0].CheckMouseOverPerInstance(i, MouseScreen.x, MouseScreen.y, ScreenWidth, ScreenHeight,
+					g_Camera.GetViewMatrix(), g_Camera.GetProjectionMatrix());
 			}
 			MyMD5Model[0].CheckMouseOverFinal();
 		}
@@ -312,8 +297,8 @@ LRESULT WINAPI MsgProc( HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam )
 
 INT WINAPI WinMain( HINSTANCE hInst, HINSTANCE, LPSTR, INT )
 {
-	#ifdef _DEBUG	// 메모리 누수 검사
-		_CrtSetDbgFlag( _CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
+	#ifdef _DEBUG	// 메모리 누수 검사★
+		_CrtSetDbgFlag( _CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF );
 	#endif
 
 	WNDCLASSEX wc = { sizeof(WNDCLASSEX), CS_CLASSDC, MsgProc, 0L, 0L, GetModuleHandle(NULL), NULL, NULL, NULL, NULL, WindowName, NULL };
@@ -346,24 +331,11 @@ INT WINAPI WinMain( HINSTANCE hInst, HINSTANCE, LPSTR, INT )
 			DetectInput(hWnd);	// Direct Input 키보드&마우스 입력 감지!
 			Render();
 
-			if (GetTickCount() >= Timer_App + 1000)			// 초시계
+			if (GetTickCount64() >= Timer_App + 1000)			// 초시계
 			{
-				Timer_App = GetTickCount();
+				Timer_App = GetTickCount64();
 				FPS_Shown = FPS;
 				FPS = 0;
-			}
-
-			if (GetTickCount() >= Timer_Animation + 80)
-			{
-				Timer_Animation = GetTickCount();
-
-				/*
-				for (int i = 0; i < MyMD5Model[0].numInstances; i++)
-				{
-					MyMD5Model[0].InstanceAnimate(i, 0.0f);
-				}
-				*/
-
 			}
 		}
 	}
@@ -377,16 +349,6 @@ VOID Cleanup()
 {
 	g_pDI->ShutdownDirectInput();
 	g_pDI->DeleteInstance();
-
-	SAFE_RELEASE(g_pModelVB);
-	SAFE_RELEASE(g_pModelIB);
-	SAFE_RELEASE(g_pModelInstanceVB);
-
-	SAFE_RELEASE(g_pBBVB);
-	SAFE_RELEASE(g_pBBIB);
-
-	SAFE_RELEASE(g_pNVVB);
-	SAFE_RELEASE(g_pNVIB);
 	
 	SAFE_RELEASE(g_pHLSL);
 	SAFE_RELEASE(g_pd3dDevice);

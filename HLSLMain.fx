@@ -1,11 +1,12 @@
 #define AnimationJointTexW	800
 #define AnimationWeightTexW	800
 #define AnimationWeightTexH	100
-#define MAX_ANIMATIONS		20			// 모델 - 애니메이션 최대 개수
-#define MAX_FRAMES			100			// 모델 - 애니메이션 최대 프레임
+#define MAX_ANIMATIONS_MD5		20			// 모델 - 애니메이션 최대 개수
+#define MAX_FRAMES_MD5			100			// 모델 - 애니메이션 최대 프레임
 
 // --- 전역 변수 --- //
 float4x4	matVP;
+float4x4	matWVP;
 
 texture		DiffuseMap_Tex;
 texture		AnimationJoint_Tex;
@@ -29,7 +30,7 @@ sampler2D	AnimationWeightSampler =
 		Texture = (AnimationWeight_Tex);
 	};
 
-struct VS_INPUT_MODEL
+struct VS_INPUT_INSTANCING
 {
 	// 정점 정보
 	float4	Position	: POSITION0;
@@ -50,7 +51,15 @@ struct VS_INPUT_MODEL
 	float	Frame1			: PSIZE6;
 };
 
-struct VS_OUTPUT_MODEL
+struct VS_INPUT_NoInstancing
+{
+	// 정점 정보
+	float4	Position	: POSITION0;
+	float3	Normal		: NORMAL0;
+	float2	Texture		: TEXCOORD0;
+};
+
+struct VS_OUTPUT
 {
 	float4 Position : POSITION0;
 	float2 Texture	: TEXCOORD0;
@@ -67,20 +76,20 @@ float GetMod(float Dividend, float Divisor)	// fmod()가 오차값을 발생시키기 때문
 float4 GetJointPosition(in int AnimID, in int FrameID, in int JointID)
 {
 	float4 Output;
-	Output.x = tex2Dlod(AnimationJointSampler, float4(((0.5 + JointID*8)/AnimationJointTexW), ((0.5 + FrameID + AnimID*MAX_FRAMES)/(MAX_FRAMES * MAX_ANIMATIONS)), 0, 0));
-	Output.y = tex2Dlod(AnimationJointSampler, float4(((0.5 + JointID*8 + 1)/AnimationJointTexW), ((0.5 + FrameID + AnimID*MAX_FRAMES)/(MAX_FRAMES * MAX_ANIMATIONS)), 0, 0));
-	Output.z = tex2Dlod(AnimationJointSampler, float4(((0.5 + JointID*8 + 2)/AnimationJointTexW), ((0.5 + FrameID + AnimID*MAX_FRAMES)/(MAX_FRAMES * MAX_ANIMATIONS)), 0, 0));
-	Output.w = tex2Dlod(AnimationJointSampler, float4(((0.5 + JointID*8 + 3)/AnimationJointTexW), ((0.5 + FrameID + AnimID*MAX_FRAMES)/(MAX_FRAMES * MAX_ANIMATIONS)), 0, 0));
+	Output.x = tex2Dlod(AnimationJointSampler, float4(((0.5 + JointID*8)/AnimationJointTexW), ((0.5 + FrameID + AnimID*MAX_FRAMES_MD5)/(MAX_FRAMES_MD5 * MAX_ANIMATIONS_MD5)), 0, 0));
+	Output.y = tex2Dlod(AnimationJointSampler, float4(((0.5 + JointID*8 + 1)/AnimationJointTexW), ((0.5 + FrameID + AnimID*MAX_FRAMES_MD5)/(MAX_FRAMES_MD5 * MAX_ANIMATIONS_MD5)), 0, 0));
+	Output.z = tex2Dlod(AnimationJointSampler, float4(((0.5 + JointID*8 + 2)/AnimationJointTexW), ((0.5 + FrameID + AnimID*MAX_FRAMES_MD5)/(MAX_FRAMES_MD5 * MAX_ANIMATIONS_MD5)), 0, 0));
+	Output.w = tex2Dlod(AnimationJointSampler, float4(((0.5 + JointID*8 + 3)/AnimationJointTexW), ((0.5 + FrameID + AnimID*MAX_FRAMES_MD5)/(MAX_FRAMES_MD5 * MAX_ANIMATIONS_MD5)), 0, 0));
 	return Output;
 }
 
 float4 GetJointOrientation(in int AnimID, in int FrameID, in int JointID)
 {
 	float4 Output;
-	Output.x = tex2Dlod(AnimationJointSampler, float4(((0.5 + JointID*8 + 4)/AnimationJointTexW), ((0.5 + FrameID + AnimID*MAX_FRAMES)/(MAX_FRAMES * MAX_ANIMATIONS)), 0, 0));
-	Output.y = tex2Dlod(AnimationJointSampler, float4(((0.5 + JointID*8 + 5)/AnimationJointTexW), ((0.5 + FrameID + AnimID*MAX_FRAMES)/(MAX_FRAMES * MAX_ANIMATIONS)), 0, 0));
-	Output.z = tex2Dlod(AnimationJointSampler, float4(((0.5 + JointID*8 + 6)/AnimationJointTexW), ((0.5 + FrameID + AnimID*MAX_FRAMES)/(MAX_FRAMES * MAX_ANIMATIONS)), 0, 0));
-	Output.w = tex2Dlod(AnimationJointSampler, float4(((0.5 + JointID*8 + 7)/AnimationJointTexW), ((0.5 + FrameID + AnimID*MAX_FRAMES)/(MAX_FRAMES * MAX_ANIMATIONS)), 0, 0));
+	Output.x = tex2Dlod(AnimationJointSampler, float4(((0.5 + JointID*8 + 4)/AnimationJointTexW), ((0.5 + FrameID + AnimID*MAX_FRAMES_MD5)/(MAX_FRAMES_MD5 * MAX_ANIMATIONS_MD5)), 0, 0));
+	Output.y = tex2Dlod(AnimationJointSampler, float4(((0.5 + JointID*8 + 5)/AnimationJointTexW), ((0.5 + FrameID + AnimID*MAX_FRAMES_MD5)/(MAX_FRAMES_MD5 * MAX_ANIMATIONS_MD5)), 0, 0));
+	Output.z = tex2Dlod(AnimationJointSampler, float4(((0.5 + JointID*8 + 6)/AnimationJointTexW), ((0.5 + FrameID + AnimID*MAX_FRAMES_MD5)/(MAX_FRAMES_MD5 * MAX_ANIMATIONS_MD5)), 0, 0));
+	Output.w = tex2Dlod(AnimationJointSampler, float4(((0.5 + JointID*8 + 7)/AnimationJointTexW), ((0.5 + FrameID + AnimID*MAX_FRAMES_MD5)/(MAX_FRAMES_MD5 * MAX_ANIMATIONS_MD5)), 0, 0));
 	return Output;
 }
 
@@ -128,27 +137,100 @@ float4 GetWeightNormal(in int WeightID)
 	return Output;
 }
 
-float4 QuaternionMul( float4 Q1, float4 Q2 )
+float QuaternionDot(float4 Q1, float4 Q2)
 {
-	float4 Output;
+	float Output = 0;
+	Output = Q1.x * Q2.x + Q1.y * Q2.y + Q1.z * Q2.z + Q1.w * Q2.w;
+	return Output;
+}
+
+float4 QuaternionNormalize(float4 Q1)
+{
+	float4 Output = float4(0, 0, 0, 0);
+	float denominator = sqrt(Q1.x * Q1.x + Q1.y * Q1.y + Q1.z * Q1.z + Q1.w * Q1.w);
+
+	Output.x = Q1.x / denominator;
+	Output.y = Q1.y / denominator;
+	Output.z = Q1.z / denominator;
+	Output.w = Q1.w / denominator;
+	return Output;
+}
+
+float4 QuaternionLerp(float4 Q1, float4 Q2, float t)
+{
+	float4 Output = float4(0, 0, 0, 0);
+	Output = Q1 + (Q2 - Q1) * t;
+	Output = QuaternionNormalize(Output);
+	return Output;
+}
+
+float4 QuaternionSlerp(float4 Q1, float4 Q2, float t)
+{
+	float4 Output = float4(0, 0, 0, 0);
+
+	Q1 = QuaternionNormalize(Q1);
+	Q2 = QuaternionNormalize(Q2);
+
+	float dot = QuaternionDot(Q1, Q2);
+
+	if (dot > (float)0.9995)
+		return QuaternionLerp(Q1, Q2, t);;
+
+	if (dot < 0)	// 정말 중요함!★★
+	{
+		Q2 = -Q2;
+		dot = -dot;
+	}
+
+	dot = clamp(dot, -1, 1);	// 필요한가..?
+	float theta = acos(dot) * t;
+
+	float4 Q3 = Q2 - Q1 * dot;
+	Q3 = QuaternionNormalize(Q3);
+
+	Output.x = (Q1.x * cos(theta) + Q3.x * sin(theta));
+	Output.y = (Q1.y * cos(theta) + Q3.y * sin(theta));
+	Output.z = (Q1.z * cos(theta) + Q3.z * sin(theta));
+	Output.w = (Q1.w * cos(theta) + Q3.w * sin(theta));
+
+	return Output;
+}
+
+float4 QuaternionInverse(float4 Q1)
+{
+	float4 Output = float4(0, 0, 0, 0);
+	Output.x = -Q1.x;
+	Output.y = -Q1.y;
+	Output.z = -Q1.z;
+	Output.w = Q1.w;
+	return Output;
+}
+
+float4 QuaternionMultiply(float4 Q1, float4 Q2)
+{
+	float4 Output = float4(0, 0, 0, 0);
+
 	Output.x = (Q2.w * Q1.x) + (Q2.x * Q1.w) + (Q2.y * Q1.z) - (Q2.z * Q1.y);
 	Output.y = (Q2.w * Q1.y) - (Q2.x * Q1.z) + (Q2.y * Q1.w) + (Q2.z * Q1.x);
 	Output.z = (Q2.w * Q1.z) + (Q2.x * Q1.y) - (Q2.y * Q1.x) + (Q2.z * Q1.w);
 	Output.w = (Q2.w * Q1.w) - (Q2.x * Q1.x) - (Q2.y * Q1.y) - (Q2.z * Q1.z);
+
 	return Output;
 }
 
-float4 QuaternionRotateF( float4 Q1, float4 Pos )
+float4 QuaternionRotate(float4 Quaternion, float4 Position)
 {
-	float4 Output;
-	float4 Q2 = float4(-Q1.x, -Q1.y, -Q1.z, Q1.w);
-	Output = QuaternionMul( QuaternionMul(Q1, Pos), Q2 );
+	float4 Output = float4(0, 0, 0, 0);
+	float4 QuatInv = QuaternionInverse(Quaternion);
+
+	Output = QuaternionMultiply(QuaternionMultiply(Quaternion, Position), QuatInv);
+
 	return Output;
 }
 
-VS_OUTPUT_MODEL vs_main( VS_INPUT_MODEL Input )
+VS_OUTPUT vs_md5instancing( VS_INPUT_INSTANCING Input )
 {
-	VS_OUTPUT_MODEL Output;
+	VS_OUTPUT Output;
 
 	// 인스턴스별 월드 행렬
 	float4x4 matWorld = float4x4(Input.matWorld0.x, Input.matWorld0.y, Input.matWorld0.z, Input.matWorld0.w,
@@ -167,6 +249,8 @@ VS_OUTPUT_MODEL vs_main( VS_INPUT_MODEL Input )
 	float CurFrameTime	= Input.CurFrameTime;
 	int Frame0	= Input.Frame0;
 	int Frame1	= Input.Frame1;
+	float Interpolation = CurFrameTime - Frame0;
+	
 
 	for (int i = 0; i < WeightNum; i++)
 	{
@@ -179,11 +263,27 @@ VS_OUTPUT_MODEL vs_main( VS_INPUT_MODEL Input )
 
 		float4 Joint0Pos = GetJointPosition(AnimID, Frame0, JointID);
 		float4 Joint0Ori = GetJointOrientation(AnimID, Frame0, JointID);
+		float4 Joint1Pos = GetJointPosition(AnimID, Frame1, JointID);
+		float4 Joint1Ori = GetJointOrientation(AnimID, Frame1, JointID);
 
-		float4 RotatedPos = QuaternionRotateF(Joint0Ori, WeightPos);
-		TempPosition += ( Joint0Pos + RotatedPos ) * Bias;
+		float4 InterPos = Joint0Pos + (Interpolation * (Joint1Pos - Joint0Pos));
+		float4 InterOri = QuaternionSlerp(Joint0Ori, Joint1Ori, Interpolation);
 
-		float4 RotatedNorm = QuaternionRotateF(Joint0Ori, WeightNorm);
+		float4 RotatedPos = QuaternionRotate(Joint0Ori, WeightPos);
+		TempPosition.x += (Joint0Pos.x + RotatedPos.x) * Bias;
+		TempPosition.y += (Joint0Pos.y + RotatedPos.y) * Bias;
+		TempPosition.z += (Joint0Pos.z + RotatedPos.z) * Bias;
+		TempPosition.w = 1;
+
+		/*
+		float4 RotatedPos = QuaternionRotateF(InterOri, WeightPos);
+		TempPosition.x += (InterPos.x + RotatedPos.x) * Bias;
+		TempPosition.y += (InterPos.y + RotatedPos.y) * Bias;
+		TempPosition.z += (InterPos.z + RotatedPos.z) * Bias;
+		TempPosition.w = 1;
+		*/
+
+		float4 RotatedNorm = QuaternionRotate(Joint0Ori, WeightNorm);
 		TempNormal -= RotatedNorm * Bias;
 	}
 
@@ -195,43 +295,43 @@ VS_OUTPUT_MODEL vs_main( VS_INPUT_MODEL Input )
 	return( Output );
 }
 
-VS_OUTPUT_MODEL vs_still( VS_INPUT_MODEL Input )
+VS_OUTPUT vs_noinstancing( VS_INPUT_NoInstancing Input )
 {
-	VS_OUTPUT_MODEL Output;
+	VS_OUTPUT Output;
 
-	float4x4 matWorld = float4x4(Input.matWorld0.x, Input.matWorld0.y, Input.matWorld0.z, Input.matWorld0.w,
-		Input.matWorld1.x, Input.matWorld1.y, Input.matWorld1.z, Input.matWorld1.w,
-		Input.matWorld2.x, Input.matWorld2.y, Input.matWorld2.z, Input.matWorld2.w,
-		Input.matWorld3.x, Input.matWorld3.y, Input.matWorld3.z, Input.matWorld3.w);
-
-	Output.Position = mul( Input.Position, matWorld );
-	Output.Position = mul( Output.Position, matVP );
+	Output.Position = mul( Input.Position, matWVP );
 	Output.Normal = normalize( Input.Normal );
 	Output.Texture = Input.Texture;
 
 	return( Output );
 }
 
-float4 ps_main(VS_OUTPUT_MODEL Input) : COLOR
+float4 ps_main(VS_OUTPUT Input) : COLOR
 {
 	float4 albedo = tex2D(DiffuseSampler, Input.Texture);
 	return albedo.rgba;
 }
 
-technique HLSLMain
+float4 ps_color(VS_OUTPUT Input) : COLOR
+{
+	float4 color = float4(1, 0, 0, 1);
+	return color;
+}
+
+technique HLSLMD5Instancing
 {
 	pass Pass_0
 	{
-		VertexShader	= compile vs_3_0 vs_main();
+		VertexShader	= compile vs_3_0 vs_md5instancing();
 		PixelShader		= compile ps_3_0 ps_main();
 	}
 }
 
-technique HLSLStill
+technique HLSLNoInstancing
 {
 	pass Pass_0
 	{
-		VertexShader	= compile vs_3_0 vs_still();
+		VertexShader	= compile vs_3_0 vs_noinstancing();
 		PixelShader		= compile ps_3_0 ps_main();
 	}
 }

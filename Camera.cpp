@@ -29,10 +29,25 @@ DirectCamera9::DirectCamera9()
 	CamDefaultTargetY = 0.0f;
 }
 
-VOID DirectCamera9::CreateViewFrustum(D3DXMATRIXA16* matView, D3DXMATRIXA16* matProjection)
+DirectCamera9::~DirectCamera9()
+{
+	pDevice = NULL;
+}
+
+D3DXMATRIX DirectCamera9::GetViewMatrix()
+{
+	return matView;
+}
+
+D3DXMATRIX DirectCamera9::GetProjectionMatrix()
+{
+	return matProj;
+}
+
+VOID DirectCamera9::CreateViewFrustum()
 {
 	D3DXMATRIX matVP;
-	D3DXMatrixMultiply( &matVP, matView, matProjection);
+	D3DXMatrixMultiply( &matVP, &matView, &matProj);
 
 	// Left plane
 	ViewFrustum[0].a = matVP._14 + matVP._11;
@@ -90,6 +105,12 @@ bool DirectCamera9::IsSphereInFrustum( D3DXVECTOR3* pPosition, float radius)
 	return true;
 }
 
+void DirectCamera9::SetDevice(LPDIRECT3DDEVICE9 D3DDevice)
+{
+	pDevice = D3DDevice;
+	return;
+}
+
 VOID DirectCamera9::SetCamera_FirstPerson(float CameraY)
 {
 	CamDefaultForward	= D3DXVECTOR3(1.0f, CameraY, 0.0f);
@@ -117,7 +138,7 @@ VOID DirectCamera9::SetCamera_Static(float CamPX, float CamPY, float CamPZ, floa
 	CamUp		= D3DXVECTOR3(0.0f, 1.0f, 0.0f);
 }
 
-VOID DirectCamera9::UseCamera_FirstPerson(LPDIRECT3DDEVICE9 D3DDevice, D3DXMATRIXA16* matView)
+VOID DirectCamera9::UseCamera_FirstPerson()
 {
 	CameraType = 0;
 
@@ -140,11 +161,11 @@ VOID DirectCamera9::UseCamera_FirstPerson(LPDIRECT3DDEVICE9 D3DDevice, D3DXMATRI
 	CamMoveBF = 0.0f;
 
 	CamTarget = CamPosition + CamTarget;
-	D3DXMatrixLookAtLH( matView, &CamPosition, &CamTarget, &CamUp );
-	D3DDevice->SetTransform( D3DTS_VIEW, matView );
+	D3DXMatrixLookAtLH( &matView, &CamPosition, &CamTarget, &CamUp );
+	pDevice->SetTransform( D3DTS_VIEW, &matView );
 }
 
-VOID DirectCamera9::UseCamera_FreeLook(LPDIRECT3DDEVICE9 D3DDevice, D3DXMATRIXA16* matView)
+VOID DirectCamera9::UseCamera_FreeLook()
 {
 	CameraType = 1;
 
@@ -164,11 +185,11 @@ VOID DirectCamera9::UseCamera_FreeLook(LPDIRECT3DDEVICE9 D3DDevice, D3DXMATRIXA1
 	CamMoveBF = 0.0f;
 
 	CamTarget = CamPosition + CamTarget;
-	D3DXMatrixLookAtLH( matView, &CamPosition, &CamTarget, &CamUp );
-	D3DDevice->SetTransform( D3DTS_VIEW, matView );
+	D3DXMatrixLookAtLH( &matView, &CamPosition, &CamTarget, &CamUp );
+	pDevice->SetTransform( D3DTS_VIEW, &matView );
 }
 
-VOID DirectCamera9::UseCamera_ThirdPerson(LPDIRECT3DDEVICE9 D3DDevice, D3DXMATRIXA16* matView, D3DXVECTOR3 SpritePosition)
+VOID DirectCamera9::UseCamera_ThirdPerson(D3DXVECTOR3 SpritePosition)
 {
 	CameraType = 2;
 
@@ -182,17 +203,23 @@ VOID DirectCamera9::UseCamera_ThirdPerson(LPDIRECT3DDEVICE9 D3DDevice, D3DXMATRI
 	D3DXVec3TransformCoord(&CamPosition, &CamDefaultPosition, &matCameraRotation);
 	CamPosition += CamTarget;
 
-	D3DXMatrixLookAtLH( matView, &CamPosition, &CamTarget, &CamUp );
-	D3DDevice->SetTransform( D3DTS_VIEW, matView );
+	D3DXMatrixLookAtLH( &matView, &CamPosition, &CamTarget, &CamUp );
+	pDevice->SetTransform( D3DTS_VIEW, &matView );
 }
 
-VOID DirectCamera9::UseCamera_Static(LPDIRECT3DDEVICE9 D3DDevice, D3DXMATRIXA16* matView)
+VOID DirectCamera9::UseCamera_Static()
 {
 	CameraType = 3;
 
 	// (옵션4) 정적 카메라(Static Camera)
-	D3DXMatrixLookAtLH( matView, &CamPosition, &CamTarget, &CamUp );
-	D3DDevice->SetTransform( D3DTS_VIEW, matView );
+	D3DXMatrixLookAtLH( &matView, &CamPosition, &CamTarget, &CamUp );
+	pDevice->SetTransform( D3DTS_VIEW, &matView );
+}
+
+VOID DirectCamera9::SetProjection(float ZFar)
+{
+	D3DXMatrixPerspectiveFovLH( &matProj, D3DX_PI/4, 1.0f, 1.0f, ZFar );
+	pDevice->SetTransform( D3DTS_PROJECTION, &matProj );
 }
 
 VOID DirectCamera9::MoveCamera_BackForth(bool MoveBack, float MoveDistance)

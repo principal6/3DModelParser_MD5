@@ -118,7 +118,7 @@ bool DirectInput::DIMouseButtonHandler(int button)
 			MouseButtonIdle[button] = true;
 			MouseButtonDown[button] = false;
 		}
-		else if ( (MouseButtonDown[button] == true) && (MouseButtonUp[button] == false) && (MouseButtonIdle[button] == true) )
+		else if ( (MouseButtonDown[button] == true) && (MouseButtonIdle[button] == true) )
 		{
 			MouseButtonUp[button] = true;
 			MouseButtonDown[button] = false;
