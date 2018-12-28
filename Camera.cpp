@@ -49,6 +49,13 @@ VOID DirectCamera9::SetCamera_ThirdPerson(float DistanceHigh, float DistanceFar,
 	CamDefaultTargetY	= TargetY;
 }
 
+VOID DirectCamera9::SetCamera_Static(float CamPX, float CamPY, float CamPZ, float CamTX, float CamTY, float CamTZ)
+{
+	CamPosition	= D3DXVECTOR3(CamPX, CamPY, CamPZ);
+	CamTarget	= D3DXVECTOR3(CamTX, CamTY, CamTZ);
+	CamUp		= D3DXVECTOR3(0.0f, 1.0f, 0.0f);
+}
+
 VOID DirectCamera9::UseCamera_FirstPerson(LPDIRECT3DDEVICE9 D3DDevice, D3DXMATRIXA16* matView)
 {
 	CameraType = 0;
@@ -114,6 +121,15 @@ VOID DirectCamera9::UseCamera_ThirdPerson(LPDIRECT3DDEVICE9 D3DDevice, D3DXMATRI
 	D3DXVec3TransformCoord(&CamPosition, &CamDefaultPosition, &matCameraRotation);
 	CamPosition += CamTarget;
 
+	D3DXMatrixLookAtLH( matView, &CamPosition, &CamTarget, &CamUp );
+	D3DDevice->SetTransform( D3DTS_VIEW, matView );
+}
+
+VOID DirectCamera9::UseCamera_Static(LPDIRECT3DDEVICE9 D3DDevice, D3DXMATRIXA16* matView)
+{
+	CameraType = 3;
+
+	// (옵션4) 정적 카메라(Static Camera)
 	D3DXMatrixLookAtLH( matView, &CamPosition, &CamTarget, &CamUp );
 	D3DDevice->SetTransform( D3DTS_VIEW, matView );
 }

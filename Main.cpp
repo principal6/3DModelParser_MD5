@@ -260,6 +260,7 @@ VOID Render()
 			SetupModelMatrix(MyMD5Model[0].ModelInstances[i].Translation,
 				MyMD5Model[0].ModelInstances[i].Rotation,
 				MyMD5Model[0].ModelInstances[i].Scaling);
+			
 			MyMD5Model[0].InstanceAnimate(i, 0.0f);
 
 			if (bDrawBoundingBoxes == true)
@@ -268,12 +269,23 @@ VOID Render()
 			if (bDrawNormalVectors == true)
 				MyMD5Model[0].DrawNormalVecters(g_pd3dDevice, 2.0f);
 
+			MyMD5Model[0].CheckMouseOverPerInstance(g_pd3dDevice, i, MouseScreen.x, MouseScreen.y, ScreenWidth, ScreenHeight, matView, matProj);
+
 			MyMD5Model[0].DrawModel(g_pd3dDevice);
 		}
 
 		g_Font.SetFontColor(0xFFFFFFFF);
 		g_Font.DrawTextA(0, 0, "FPS: ");
 		g_Font.DrawTextA(40, 0, FPS_Shown);
+		g_Font.DrawTextA(0, 20, MyMD5Model[0].MouseOverPerInstances[0]);
+		g_Font.DrawTextA(0, 40, MyMD5Model[0].PickedPosition[0].x);
+		g_Font.DrawTextA(0, 60, MyMD5Model[0].PickedPosition[0].y);
+		g_Font.DrawTextA(0, 80, MyMD5Model[0].PickedPosition[0].z);
+		g_Font.DrawTextA(100, 20, MyMD5Model[0].MouseOverPerInstances[1]);
+		g_Font.DrawTextA(100, 40, MyMD5Model[0].PickedPosition[1].x);
+		g_Font.DrawTextA(100, 60, MyMD5Model[0].PickedPosition[1].y);
+		g_Font.DrawTextA(100, 80, MyMD5Model[0].PickedPosition[1].z);
+
 
 		g_pd3dDevice->EndScene();
 	}

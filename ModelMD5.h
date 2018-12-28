@@ -1,11 +1,5 @@
-#include <iostream>
-#include <d3dx9.h>
-#include <xnamath.h>
 #include "Global.h"
-
-#define MAX_PARSE_LINE		512			// 파일에서 읽어 들일 한 줄의 최대 길이
-#define MAX_KEYWORD_LEN		64			// 파싱을 위한 키워드의 최대 길이
-#define MAX_NAME_LEN		256			// 각종 이름들의 최대 길이
+#include "Parser.h"
 
 #define MAX_JOINTS			100			// 모델 - 최대 관절 개수			66
 #define MAX_OBJECTS			5			// 모델 - 최대 물체 개수
@@ -23,9 +17,6 @@
 #define MAX_FRAMES			160			// 모델 - 애니메이션 최대 프레임
 
 #define MAX_INSTANCES		100			// 모델 - 최대 인스턴스 개수
-
-typedef char ANYNAME[MAX_NAME_LEN];		// 이름 저장용 변수 유형
-typedef char KEYWORD[MAX_KEYWORD_LEN];	// 키워드 저장용 변수 유형
 
 
 // 정점 구조체 선언 - 위치(Position), 텍스처 좌표(Texture Coordinates), 법선 벡터(Normal) //
@@ -45,7 +36,6 @@ struct VERTEX_MD5_NORMAL
 {
 	XMFLOAT3 Normal;
 };
-
 
 #define D3DFVF_VERTEX_MD5 (D3DFVF_XYZ | D3DFVF_NORMAL | D3DFVF_TEX1)
 #define D3DFVF_VERTEX_MD5_BB (D3DFVF_XYZ)
@@ -184,6 +174,9 @@ public:
 
 	int						numInstances;
 	Instance_MD5			ModelInstances[MAX_INSTANCES];
+	bool					MouseOverPerInstances[MAX_INSTANCES];
+	float					DistanceCmp[MAX_INSTANCES];
+	XMFLOAT3				PickedPosition[MAX_INSTANCES];
 	
 	char					BaseDir[MAX_NAME_LEN];
 	void ModelMD5::SetBaseDirection(char* Dir);
@@ -204,6 +197,10 @@ public:
 	void ModelMD5::DrawModel(LPDIRECT3DDEVICE9 D3DDevice);
 	void ModelMD5::DrawBoundingBoxes(LPDIRECT3DDEVICE9 D3DDevice, int InstanceID);
 	HRESULT ModelMD5::DrawNormalVecters(LPDIRECT3DDEVICE9 D3DDevice, float LenFactor);
+	PickingRay ModelMD5::GetPickingRay(LPDIRECT3DDEVICE9 D3DDevice, int MouseX, int MouseY,
+		int ScreenWidth, int ScreenHeight, D3DXMATRIX matView, D3DXMATRIX matProj);
+	bool ModelMD5::CheckMouseOverPerInstance(LPDIRECT3DDEVICE9 D3DDevice, int InstanceID, int MouseX, int MouseY,
+		int ScreenWidth, int ScreenHeight, D3DXMATRIX matView, D3DXMATRIX matProj);
 
 	HRESULT ModelMD5::SetTexture(LPDIRECT3DDEVICE9 D3DDevice, int MeshIndex);
 	HRESULT ModelMD5::UpdateVertices(LPDIRECT3DDEVICE9 D3DDevice, int MeshIndex);

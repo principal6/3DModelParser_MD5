@@ -52,7 +52,11 @@ ModelMD5::ModelMD5()
 	memset(ModelMaterials, 0, sizeof(ModelMaterials));
 	memset(ModelMeshes, 0, sizeof(ModelMeshes));
 	memset(&ModelAnimation, 0, sizeof(ModelAnimation));
+
 	memset(&ModelInstances, 0, sizeof(ModelInstances));
+	memset(MouseOverPerInstances, 0, sizeof(MouseOverPerInstances));
+	memset(DistanceCmp, 0, sizeof(DistanceCmp));
+	memset(PickedPosition, 0, sizeof(PickedPosition));
 
 	memset(numMeshVertices, 0, sizeof(numMeshVertices));
 	memset(numMeshIndices, 0, sizeof(numMeshIndices));
@@ -1296,4 +1300,116 @@ HRESULT ModelMD5::DrawNormalVecters(LPDIRECT3DDEVICE9 D3DDevice, float LenFactor
 	}
 
 	return S_OK;	// 함수 종료!
+}
+
+PickingRay ModelMD5::GetPickingRay(LPDIRECT3DDEVICE9 D3DDevice, int MouseX, int MouseY,
+	int ScreenWidth, int ScreenHeight, D3DXMATRIX matView, D3DXMATRIX matProj)
+{
+	if (MouseX < 0 || MouseY < 0 || MouseX > ScreenWidth || MouseY > ScreenHeight)
+		return PickingRay(D3DXVECTOR3(0,0,0), D3DXVECTOR3(9999.0f,0,0));
+
+	D3DVIEWPORT9 vp;
+	D3DXMATRIX InvView;
+
+	D3DXVECTOR3 MouseViewPortXY, PickingRayDir, PickingRayPos;
+
+	D3DDevice->GetViewport(&vp);
+	D3DXMatrixInverse(&InvView, NULL, &matView);
+
+	MouseViewPortXY.x = (( (((MouseX-vp.X)*2.0f/vp.Width ) - 1.0f)) - matProj._31 ) / matProj._11;
+	MouseViewPortXY.y = ((- (((MouseY-vp.Y)*2.0f/vp.Height) - 1.0f)) - matProj._32 ) / matProj._22;
+	MouseViewPortXY.z = 1.0f;
+
+	PickingRayDir.x = MouseViewPortXY.x*InvView._11 + MouseViewPortXY.y*InvView._21 + MouseViewPortXY.z*InvView._31;
+	PickingRayDir.y = MouseViewPortXY.x*InvView._12 + MouseViewPortXY.y*InvView._22 + MouseViewPortXY.z*InvView._32;
+	PickingRayDir.z = MouseViewPortXY.x*InvView._13 + MouseViewPortXY.y*InvView._23 + MouseViewPortXY.z*InvView._33;
+	D3DXVec3Normalize(&PickingRayDir, &PickingRayDir);
+
+	PickingRayPos.x = InvView._41;
+	PickingRayPos.y = InvView._42;
+	PickingRayPos.z = InvView._43;
+
+	return PickingRay(PickingRayPos, PickingRayDir);
+}
+
+bool ModelMD5::CheckMouseOverPerInstance(LPDIRECT3DDEVICE9 D3DDevice, int InstanceID, int MouseX, int MouseY,
+	int ScreenWidth, int ScreenHeight, D3DXMATRIX matView, D3DXMATRIX matProj)
+{
+	PickingRay PR = GetPickingRay(D3DDevice, MouseX, MouseY, ScreenWidth, ScreenHeight, matView, matProj);
+
+	if (PR.Dir.x == 9999.0f)
+		return false;
+
+	DistanceCmp[InstanceID]				= FLT_MAX;
+	MouseOverPerInstances[InstanceID]	= false;
+	PickedPosition[InstanceID]			= XMFLOAT3(0, 0, 0);
+
+		for (int j = 0; j < numMeshes; j++)
+		{
+			int numIndices = numMeshIndices[j];
+
+			for (int i = 0; i < numIndices; i++)
+			{
+				int ID0 = ModelMeshes[j].Indices[i]._0;
+				int ID1 = ModelMeshes[j].Indices[i]._1;
+				int ID2 = ModelMeshes[j].Indices[i]._2;
+
+				D3DXVECTOR3 p0, p1, p2;
+				p0 = D3DXVECTOR3(ModelMeshes[j].Vertices[ID0].Position.x, ModelMeshes[j].Vertices[ID0].Position.y, ModelMeshes[j].Vertices[ID0].Position.z);
+				p1 = D3DXVECTOR3(ModelMeshes[j].Vertices[ID1].Position.x, ModelMeshes[j].Vertices[ID1].Position.y, ModelMeshes[j].Vertices[ID1].Position.z);
+				p2 = D3DXVECTOR3(ModelMeshes[j].Vertices[ID2].Position.x, ModelMeshes[j].Vertices[ID2].Position.y, ModelMeshes[j].Vertices[ID2].Position.z);
+
+				// 인스턴스
+				D3DXMATRIX matInstTrans;
+				D3DXMATRIX matInstRotX;
+				D3DXMATRIX matInstRotY;
+				D3DXMATRIX matInstRotZ;
+				D3DXMATRIX matInstScal;
+				D3DXMATRIX matInstWorld;
+
+				D3DXMatrixTranslation(&matInstTrans,
+					ModelInstances[InstanceID].Translation.x, ModelInstances[InstanceID].Translation.y, ModelInstances[InstanceID].Translation.z);
+
+				D3DXMatrixRotationX(&matInstRotX, ModelInstances[InstanceID].Rotation.x);
+				D3DXMatrixRotationY(&matInstRotY, ModelInstances[InstanceID].Rotation.y);
+				D3DXMatrixRotationZ(&matInstRotZ, ModelInstances[InstanceID].Rotation.z);
+
+				D3DXMatrixScaling(&matInstScal,
+					ModelInstances[InstanceID].Scaling.x, ModelInstances[InstanceID].Scaling.y, ModelInstances[InstanceID].Scaling.z);
+				
+				matInstWorld = matInstRotX * matInstRotY * matInstRotZ * matInstScal * matInstTrans;
+
+				D3DXVec3TransformCoord(&p0, &p0, &matInstWorld);
+				D3DXVec3TransformCoord(&p1, &p1, &matInstWorld);
+				D3DXVec3TransformCoord(&p2, &p2, &matInstWorld);
+
+				float pU, pV, pDist;
+
+				if (D3DXIntersectTri(&p0, &p1, &p2, &PR.Pos, &PR.Dir, &pU, &pV, &pDist))
+				{
+					if (pDist < DistanceCmp[InstanceID])
+					{
+						DistanceCmp[InstanceID] = pDist;
+						D3DXVECTOR3 TempPosition = p0 + (p1*pU - p0*pU) + (p2*pV - p0*pV);
+						D3DXVec3TransformCoord(&TempPosition, &TempPosition, &matInstWorld);
+
+						PickedPosition[InstanceID].x = TempPosition.x;
+						PickedPosition[InstanceID].y = TempPosition.y;
+						PickedPosition[InstanceID].z = TempPosition.z;
+					}
+
+					MouseOverPerInstances[InstanceID] = true;
+				}
+			}
+		}
+
+	switch (MouseOverPerInstances[InstanceID])
+	{
+		case true:
+			return true;
+		case false:
+			return false;
+	}
+
+	return false;
 }
