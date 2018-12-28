@@ -12,7 +12,7 @@ KEYWORD	MD5KeyWords[] =
 	"joints"		,	// 6
 	"objects"		,	// 7
 	"materials"		,	// 8
-	"mesh"			,	// 9
+	"mesh "			,	// 9★★
 	"//"			,	// 10
 	"meshindex"		,	// 11
 	"shader"		,	// 12
@@ -37,15 +37,15 @@ struct MD5Joint
 {
 	ANYNAME			Name;
 	int				ParentID;
-	ANY3DVECTOR3	Position;
-	ANY3DVECTOR4	Orientation;
+	XMFLOAT3		Position;
+	XMFLOAT4		Orientation;
 };
 
 struct MD5Weight
 {
-	int				JointIndex;
+	int				JointID;
 	float			Bias;
-	ANY3DVECTOR3	Position;
+	XMFLOAT3		Position;
 };
 
 struct MD5Object	// 최신 버전
@@ -76,8 +76,8 @@ struct MD5Mesh
 
 struct MD5BoundingBox
 {
-	ANY3DVECTOR3 Min;
-	ANY3DVECTOR3 Max;
+	XMFLOAT3 Min;
+	XMFLOAT3 Max;
 };
 
 struct MD5Frame
@@ -322,121 +322,6 @@ void GetFloatFromLine(char* line, char* split, char* splita)
 	}
 }
 
-ANY3DVECTOR4 QuaternionMultiplyFloat(ANY3DVECTOR4 Q1, float Val)	// 사원수와 숫자의 곱
-{
-	ANY3DVECTOR4	Result;
-
-	Result.x = Q1.x * Val;
-	Result.y = Q1.y * Val;
-	Result.z = Q1.z * Val;
-	Result.w = Q1.w * Val;
-
-	return		Result;
-}
-
-ANY3DVECTOR4 QuaternionMultiply(ANY3DVECTOR4 Q1, ANY3DVECTOR4 Q2)	// 사원수(Quaternion) 값과 위치(Position) 값을 곱해서 회전시킨다! ★
-{
-	ANY3DVECTOR4	Result;
-
-	// 사원수(x, y, z, w) * 위치(x, y, z, 0.0f) * 역사원수(-x, -y, -z, w) = 회전된 위치(x, y, z, 0.0f)★
-
-	Result.x = (Q2.w * Q1.x) + (Q2.x * Q1.w) + (Q2.y * Q1.z) - (Q2.z * Q1.y);
-	Result.y = (Q2.w * Q1.y) - (Q2.x * Q1.z) + (Q2.y * Q1.w) + (Q2.z * Q1.x);
-	Result.z = (Q2.w * Q1.z) + (Q2.x * Q1.y) - (Q2.y * Q1.x) + (Q2.z * Q1.w);
-	Result.w = (Q2.w * Q1.w) - (Q2.x * Q1.x) - (Q2.y * Q1.y) - (Q2.z * Q1.z);
-
-	return		Result;
-}
-
-ANY3DVECTOR4 QuaternionSum(ANY3DVECTOR4 Q1, ANY3DVECTOR4 Q2)	// 사원수의 덧셈
-{
-	ANY3DVECTOR4	Result;
-
-	Result.x = Q1.x + Q2.x;
-	Result.y = Q1.y + Q2.y;
-	Result.z = Q1.z + Q2.z;
-	Result.w = Q1.w + Q2.w;
-
-	return		Result;
-}
-
-ANY3DVECTOR4 QuaternionNormalize(ANY3DVECTOR4 Q)	// 사원수(Quaternion) 값을 정규화(Normalize)한다.
-{
-	ANY3DVECTOR4	Result;
-	float		DevideBy = sqrt(Q.x*Q.x + Q.y*Q.y + Q.z*Q.z + Q.w*Q.w);
-
-	Result.x = Q.x / DevideBy;
-	Result.y = Q.y / DevideBy;
-	Result.z = Q.z / DevideBy;
-	Result.w = Q.w / DevideBy;
-
-	return		Result;
-}
-
-ANY3DVECTOR4 QuaternionInverse(ANY3DVECTOR4 Q)
-{
-	ANY3DVECTOR4	Result;
-	float			DevideBy = Q.x*Q.x + Q.y*Q.y + Q.z*Q.z + Q.w*Q.w;	// 이걸로 나눠줘야 정규화된다!
-
-	Result.x = -Q.x	/ DevideBy;
-	Result.y = -Q.y	/ DevideBy;
-	Result.z = -Q.z	/ DevideBy;
-	Result.w =  Q.w	/ DevideBy;
-
-	return			Result;
-}
-
-float QuaternionDot(ANY3DVECTOR4 Q1, ANY3DVECTOR4 Q2)		// 사원수의 내적
-{
-	float	Result;
-
-	Result = Q1.x * Q2.x + Q1.y * Q2.y + Q1.z * Q2.z + Q1.w * Q2.w;
-
-	return Result;
-}
-
-ANY3DVECTOR4 QuaternionLerp(ANY3DVECTOR4 Q1, ANY3DVECTOR4 Q2, float Time)	// 사원수 두 개를 선형 보간(Linear intERPolation)한다.
-{
-	ANY3DVECTOR4 Result;
-
-	Result = QuaternionNormalize( QuaternionSum( QuaternionMultiplyFloat(Q1, 1-Time), QuaternionMultiplyFloat(Q2, Time) ) );
-
-	return Result;
-}
-
-ANY3DVECTOR4 QuaternionSlerp(ANY3DVECTOR4 Q1, ANY3DVECTOR4 Q2, float Time)	// 사원수 두 개를 구면 선형 보간(Spherical Linear intERPolation)한다.
-{
-	ANY3DVECTOR4	Result;
-	float Dot = QuaternionDot(Q1, Q2);
-
-	if (Dot < 0)
-	{
-		Dot = -Dot;
-		Result = QuaternionInverse(Q2);
-	} else Result = Q2;
-		
-	if (Dot < 0.95f)
-	{
-		float Angle = acosf(Dot);
-		Result = QuaternionSum( QuaternionMultiplyFloat( Q1, sinf(Angle*(1-Time))/sinf(Angle) ),
-			QuaternionMultiplyFloat( Result, sinf(Angle*Time)/sinf(Angle) ) );
-		return Result;
-	} else	// 각도가 작을 경우, 선형 보간을 한다.
-		Result = QuaternionLerp(Q1, Q2, Time);
-		return Result;
-}
-
-ANY3DVECTOR4 SetANY3DVECTOR4(float x, float y, float z, float w)
-{
-	ANY3DVECTOR4 Result;
-	Result.x = x;
-	Result.y = y;
-	Result.z = z;
-	Result.w = w;
-
-	return Result;
-}
-
 bool ModelMD5::OpenModelFromFile(char* FileName)
 {
 	FILE*	fp;							// 불러올 파일
@@ -546,25 +431,25 @@ bool ModelMD5::OpenModelFromFile(char* FileName)
 		{
 			CurKeyCount++;
 
-			// joint의 이름에 공백이 들어가 있는 경우에 대비해 이름 읽어온 후 지우고 float값을 얻어온다.
-			char tempName[MAX_NAME_LEN];
-			memset(tempName, 0, sizeof(tempName));
-			strcpy_s( tempName, GetNameBetweenQuotes(sLine) );
-			strcpy_s( ModelJoints[CurKeyCount-1].Name, tempName );
-			int	tempLen = strlen(tempName) + 2;	// 이름 & 앞뒤 쌍따옴표 제거하기 위함
-
-			char tempLine[MAX_PARSE_LINE];
-			memset(tempLine, 0, sizeof(tempLine));
-			int	tempLineLen = strlen(sLine);
-
-			for (int i = 0; i < tempLineLen-tempLen; i++)
-			{
-				tempLine[i] = sLine[i+tempLen];
-			}
-
-			GetFloatFromLine(tempLine, " ", TabChar);
-			
 			MD5Joint	TempJoint;
+
+				// joint의 이름에 공백이 들어가 있는 경우에 대비해 이름 읽어온 후 지우고 float값을 얻어온다.
+				char tempName[MAX_NAME_LEN];
+				memset(tempName, 0, sizeof(tempName));
+				strcpy_s( tempName, GetNameBetweenQuotes(sLine) );
+				strcpy_s( TempJoint.Name, tempName );
+				int	tempLen = strlen(tempName) + 2;	// 이름 & 앞뒤 쌍따옴표 제거하기 위함
+
+				char tempLine[MAX_PARSE_LINE];
+				memset(tempLine, 0, sizeof(tempLine));
+				int	tempLineLen = strlen(sLine);
+
+				for (int i = 0; i < tempLineLen-tempLen; i++)
+				{
+					tempLine[i] = sLine[i+tempLen];
+				}
+
+				GetFloatFromLine(tempLine, " ", TabChar);
 
 				TempJoint.ParentID = (int)ParseFloats[0];
 				TempJoint.Position.x = ParseFloats[2];
@@ -632,13 +517,20 @@ bool ModelMD5::OpenModelFromFile(char* FileName)
 
 			if ( FindString(sLine, MD5KeyWords[12]) )	// shader
 			{
-				if ( MD5Version == 10 ) // 옛날 버전이면 바로 텍스처 파일 이름이 나옴!!★
-				{
-					strcpy_s( ModelMaterials[MeshCount-1].TextureFileName, SplitString(sLine, "\"", 1) );
-				}
-				else					// 최신 버전이면 material의 이름이 나옴!
+				if ( MD5Version == 4843 )	// 신버전이면 material의 이름이 나옴!★
 				{
 					strcpy_s( ModelMeshes[MeshCount-1].MaterialName, SplitString(sLine, "\"", 1) );
+					for (int i = 0; i < numMaterials; i++)
+					{
+						if ( FindString( ModelMeshes[MeshCount-1].MaterialName, ModelMaterials[i].Name) )
+							strcpy_s( ModelMaterials[MeshCount-1].TextureFileName,  ModelMaterials[i].TextureFileName );
+					}
+				}
+				else						// 구버전이면 바로 텍스처 파일 이름이 나옴!
+				{
+					numMaterials++;
+					strcpy_s( ModelMeshes[MeshCount-1].MaterialName, SplitString(sLine, "\"", 1) );
+					strcpy_s( ModelMaterials[MeshCount-1].TextureFileName, SplitString(sLine, "\"", 1) );
 				}
 
 				continue;
@@ -690,7 +582,8 @@ bool ModelMD5::OpenModelFromFile(char* FileName)
 			{
 				GetFloatFromLine(sLine, " ", TabChar);
 				int WIndex = (int)ParseFloats[1];
-				ModelMeshes[MeshCount-1].Weights[WIndex].JointIndex = (int)ParseFloats[2];
+				ModelMeshes[MeshCount-1].Weights[WIndex].JointID = (int)ParseFloats[2];
+
 				ModelMeshes[MeshCount-1].Weights[WIndex].Bias = ParseFloats[3];
 				ModelMeshes[MeshCount-1].Weights[WIndex].Position.x = ParseFloats[5];
 				ModelMeshes[MeshCount-1].Weights[WIndex].Position.z = ParseFloats[6];		// 3DSMAX -> DIRECTX 좌표계!★
@@ -715,22 +608,26 @@ bool ModelMD5::OpenModelFromFile(char* FileName)
 			int WeightStart	= ModelMeshes[i].VertexWeightStart[j];
 			int nWeights	= ModelMeshes[i].VertexNumWeights[j];
 
-			ANY3DVECTOR3	Result = {0.0f, 0.0f, 0.0f};
+			XMFLOAT3	Result;
+				Result.x = 0.0f;
+				Result.y = 0.0f;
+				Result.z = 0.0f;
 
 			for (int k = 0; k < nWeights; k++)
 			{
-				int CurJointID = ModelMeshes[i].Weights[WeightStart+k].JointIndex;
-				ANY3DVECTOR4 Q1, POS, Q2, Rotated;
+				int CurJointID = ModelMeshes[i].Weights[WeightStart+k].JointID;
+				XMVECTOR	Q1, POS, Q2;
+				XMFLOAT3	Rotated;
 				MD5Joint	TempJoint	= ModelJoints[CurJointID];
 				MD5Weight	TempWeight	= ModelMeshes[i].Weights[WeightStart+k];
 
-				Q1	= SetANY3DVECTOR4(TempJoint.Orientation.x, TempJoint.Orientation.y, TempJoint.Orientation.z, TempJoint.Orientation.w);
+				Q1	= XMVectorSet(TempJoint.Orientation.x, TempJoint.Orientation.y, TempJoint.Orientation.z, TempJoint.Orientation.w);
 
-				POS	= SetANY3DVECTOR4(TempWeight.Position.x, TempWeight.Position.y, TempWeight.Position.z, 0.0f);
+				POS	= XMVectorSet(TempWeight.Position.x, TempWeight.Position.y, TempWeight.Position.z, 0.0f);
 
-				Q2	= QuaternionInverse(Q1);
+				Q2	= XMVectorSet(-TempJoint.Orientation.x, -TempJoint.Orientation.y, -TempJoint.Orientation.z, TempJoint.Orientation.w);
 
-				Rotated = QuaternionMultiply( QuaternionMultiply( Q1, POS ), Q2 );
+				XMStoreFloat3( &Rotated, XMQuaternionMultiply( XMQuaternionMultiply( Q1, POS ), Q2 ) );
 
 				Result.x += (TempJoint.Position.x + Rotated.x) * TempWeight.Bias;
 				Result.y += (TempJoint.Position.y + Rotated.y) * TempWeight.Bias;
@@ -773,7 +670,7 @@ bool ModelMD5::OpenAnimationFromFile(char* FileName)
 		if ( FindString(sLine, MD5KeyWords[0]) )	// MD5Version 4843
 		{
 			GetFloatFromLine(sLine, " ", TabChar);
-			// if ( MD5Version != (int)ParseFloats[1]);	// 버전이 달라도 그냥 불러오자
+			// if ( MD5Version != (int)ParseFloats[1]);	// 모델과 애니메이션의 버전이 달라도 그냥 불러오자..
 			continue;
 		}
 
@@ -896,6 +793,7 @@ bool ModelMD5::OpenAnimationFromFile(char* FileName)
 		{
 			// BASEFRAME: Joint 개수만큼 존재, 각 Frame의 기반이 되는 위치!★
 			CurKeyCount++;
+
 			GetFloatFromLine(sLine, " ", TabChar);
 
 			MD5Joint	TempBaseFrame;
@@ -917,20 +815,36 @@ bool ModelMD5::OpenAnimationFromFile(char* FileName)
 
 		if ( FindString(CurKey, MD5KeyWords[25]) )	// frame ~ {
 		{
-			// FRAME: Joint 개수만큼 존재, 각 Frame이 Baseframe에서 변화한 위치!★
+			// FRAME: 각 Frame이 Baseframe에서 변화한 위치!★
 			MD5Frame	TempFrameData;
+			memset(&TempFrameData, 0, sizeof(TempFrameData));
 			TempFrameData.FrameID = TempFrameID;
 
-			for(int i = 0; i < ModelAnimation.numAnimatedComponents; i++)
+			for(int i = 0; i < ModelAnimation.numJoints; i++)
 			{
+				if (ModelAnimation.JointInfo[i].Flags == 0)	 // 플래그가 0이면 건너뛰자!★
+					continue;
+
 				GetFloatFromLine(sLine, " ", TabChar);
 
-				TempFrameData.JointData[i++] = ParseFloats[0];
-				TempFrameData.JointData[i++] = ParseFloats[1];	// 3DSMAX -> DIRECTX 좌표계!★
-				TempFrameData.JointData[i++] = ParseFloats[2];
-				TempFrameData.JointData[i++] = ParseFloats[3];
-				TempFrameData.JointData[i++] = ParseFloats[4];	// 3DSMAX -> DIRECTX 좌표계!★
-				TempFrameData.JointData[i] = ParseFloats[5];
+				int k = ModelAnimation.JointInfo[i].StartIndex;
+
+				if (ModelAnimation.numAnimatedComponents < 6)
+				{
+					for (int j = 0; j < ModelAnimation.numAnimatedComponents; j++)
+					{
+						TempFrameData.JointData[k++] = ParseFloats[j];
+					}
+				}
+				else
+				{
+					TempFrameData.JointData[k++] = ParseFloats[0];
+					TempFrameData.JointData[k++] = ParseFloats[1];
+					TempFrameData.JointData[k++] = ParseFloats[2];
+					TempFrameData.JointData[k++] = ParseFloats[3];
+					TempFrameData.JointData[k++] = ParseFloats[4];
+					TempFrameData.JointData[k] = ParseFloats[5];
+				}
 
 				fgets(sLine, MAX_PARSE_LINE, fp);	// 파일에서 한 줄을 읽어온다.
 				StringTrim(sLine);					// 앞 뒤 공백 제거
@@ -944,25 +858,26 @@ bool ModelMD5::OpenAnimationFromFile(char* FileName)
 				MD5Joint TempFrameJoint = ModelAnimation.JointBaseFrame[i];	// 기본적으로 BaseFrame 값에서 출발!
 				TempFrameJoint.ParentID = ModelAnimation.JointInfo[i].ParentID;
 				
-				int tempJointIndexStart = ModelAnimation.JointInfo[i].StartIndex;
+				int tempJointIDStart = ModelAnimation.JointInfo[i].StartIndex;
 
 				if(ModelAnimation.JointInfo[i].Flags & 1)	//	Position.x	( 000001 )
-					TempFrameJoint.Position.x = TempFrameData.JointData[tempJointIndexStart++];
+					TempFrameJoint.Position.x		= TempFrameData.JointData[tempJointIDStart++];
 
 				if(ModelAnimation.JointInfo[i].Flags & 2)	//	Position.y	( 000010 )
-					TempFrameJoint.Position.z = TempFrameData.JointData[tempJointIndexStart++];	// 3DSMAX -> DIRECTX 좌표계!★
+					TempFrameJoint.Position.z		= TempFrameData.JointData[tempJointIDStart++];	// 3DSMAX -> DIRECTX 좌표계!★
 
 				if(ModelAnimation.JointInfo[i].Flags & 4)	//	Position.z	( 000100 )
-					TempFrameJoint.Position.y = TempFrameData.JointData[tempJointIndexStart++];
+					TempFrameJoint.Position.y		= TempFrameData.JointData[tempJointIDStart++];
 
 				if(ModelAnimation.JointInfo[i].Flags & 8)	//	Orientation.x	( 001000 )
-					TempFrameJoint.Orientation.x = TempFrameData.JointData[tempJointIndexStart++];
+					TempFrameJoint.Orientation.x	= TempFrameData.JointData[tempJointIDStart++];
 
 				if(ModelAnimation.JointInfo[i].Flags & 16)	//	Orientation.y	( 010000 )
-					TempFrameJoint.Orientation.z = TempFrameData.JointData[tempJointIndexStart++];	// 3DSMAX -> DIRECTX 좌표계!★
+					TempFrameJoint.Orientation.z	= TempFrameData.JointData[tempJointIDStart++];	// 3DSMAX -> DIRECTX 좌표계!★
 
 				if(ModelAnimation.JointInfo[i].Flags & 32)	//	Orientation.z	( 100000 )
-					TempFrameJoint.Orientation.y = TempFrameData.JointData[tempJointIndexStart];
+					TempFrameJoint.Orientation.y	= TempFrameData.JointData[tempJointIDStart];
+
 
 				// 사원수(Quaternion) w값 생성
 				float t = 1.0f - ( TempFrameJoint.Orientation.x * TempFrameJoint.Orientation.x )
@@ -979,29 +894,31 @@ bool ModelMD5::OpenAnimationFromFile(char* FileName)
 
 				if (TempFrameJoint.ParentID >= 0)	// 루트 프레임(ParentID = -1)이 아닌 경우, 부모->자식 순으로 모든 계산을 적용해야 한다!★★★
 				{
-					MD5Joint ParentJoint = ModelAnimation.FrameSekelton[FrameCount-1].Skeleton[TempFrameJoint.ParentID];
+					MD5Joint	ParentJoint = ModelAnimation.FrameSekelton[FrameCount-1].Skeleton[TempFrameJoint.ParentID];
 
-					ANY3DVECTOR4 Q1, POS, Q2, RotatedPos;
+					XMVECTOR	Q1, POS, Q2;
+					XMFLOAT3	RotatedPos;
 
-					Q1	= SetANY3DVECTOR4(ParentJoint.Orientation.x, ParentJoint.Orientation.y, ParentJoint.Orientation.z, ParentJoint.Orientation.w);
+					Q1	= XMVectorSet(ParentJoint.Orientation.x, ParentJoint.Orientation.y, ParentJoint.Orientation.z, ParentJoint.Orientation.w);
 
-					POS	= SetANY3DVECTOR4(TempFrameJoint.Position.x, TempFrameJoint.Position.y, TempFrameJoint.Position.z, 0.0f);
+					POS	= XMVectorSet(TempFrameJoint.Position.x, TempFrameJoint.Position.y, TempFrameJoint.Position.z, 0.0f);
 
-					Q2	= QuaternionInverse(Q1);
+					Q2	= XMVectorSet(-ParentJoint.Orientation.x, -ParentJoint.Orientation.y, -ParentJoint.Orientation.z, ParentJoint.Orientation.w);
 
-					RotatedPos = QuaternionMultiply( QuaternionMultiply( Q1, POS ), Q2 );
+					XMStoreFloat3( &RotatedPos, XMQuaternionMultiply( XMQuaternionMultiply( Q1, POS ), Q2 ) );
 
 					TempFrameJoint.Position.x = RotatedPos.x + ParentJoint.Position.x;
 					TempFrameJoint.Position.y = RotatedPos.y + ParentJoint.Position.y;
 					TempFrameJoint.Position.z = RotatedPos.z + ParentJoint.Position.z;
 
-					ANY3DVECTOR4	TempJointOrient;
-					TempJointOrient = TempFrameJoint.Orientation;
-					TempJointOrient = QuaternionMultiply(ParentJoint.Orientation, TempJointOrient);
-					TempJointOrient = QuaternionNormalize(TempJointOrient);
+					XMVECTOR	TempJointOrient;
+					TempJointOrient = XMVectorSet(TempFrameJoint.Orientation.x, TempFrameJoint.Orientation.y, TempFrameJoint.Orientation.z, TempFrameJoint.Orientation.w);
+					TempJointOrient = XMQuaternionMultiply(Q1, TempJointOrient);
+					TempJointOrient = XMQuaternionNormalize(TempJointOrient);
 					
-					TempFrameJoint.Orientation = TempJointOrient;
+					XMStoreFloat4(&TempFrameJoint.Orientation, TempJointOrient);
 				}
+
 				ModelAnimation.FrameSekelton[FrameCount-1].Skeleton[i] = TempFrameJoint;
 			}
 
@@ -1049,13 +966,14 @@ void ModelMD5::Animate(float Speed)
 		TempJoint.Position.y = Joint0.Position.y + (Interpolation * (Joint1.Position.y - Joint0.Position.y));
 		TempJoint.Position.z = Joint0.Position.z + (Interpolation * (Joint1.Position.z - Joint0.Position.z));
 
-		ANY3DVECTOR4 Joint0Orient = Joint0.Orientation;
-		ANY3DVECTOR4 Joint1Orient = Joint1.Orientation;
+		XMVECTOR Joint0Orient = XMVectorSet(Joint0.Orientation.x, Joint0.Orientation.y, Joint0.Orientation.z, Joint0.Orientation.w);
+		XMVECTOR Joint1Orient = XMVectorSet(Joint1.Orientation.x, Joint1.Orientation.y, Joint1.Orientation.z, Joint1.Orientation.w);
 
-		TempJoint.Orientation = QuaternionSlerp(Joint0Orient, Joint1Orient, Interpolation);	// 구면 선형 보간
+		XMStoreFloat4( &TempJoint.Orientation, XMQuaternionSlerp(Joint0Orient, Joint1Orient, Interpolation) );	// 구면 선형 보간
 
 		InterpolatedJoints[i] = TempJoint;		// 결과 값을 저장한다!
 	}
+
 
 	// 정점 정보 업데이트
 	for (int i = 0; i < numMeshes; i++)
@@ -1075,17 +993,18 @@ void ModelMD5::Animate(float Speed)
 			for (int k = 0; k < nWeights; k++)
 			{
 				MD5Weight	TempWeight	= ModelMeshes[i].Weights[WeightStart+k];
-				MD5Joint	TempJoint	= InterpolatedJoints[TempWeight.JointIndex];
+				MD5Joint	TempJoint	= InterpolatedJoints[TempWeight.JointID];
 				
-				ANY3DVECTOR4 Q1, POS, Q2, Rotated;
+				XMVECTOR	Q1, POS, Q2;
+				XMFLOAT4	Rotated;
 
-				Q1	= SetANY3DVECTOR4(TempJoint.Orientation.x, TempJoint.Orientation.y, TempJoint.Orientation.z, TempJoint.Orientation.w);
+				Q1	= XMVectorSet(TempJoint.Orientation.x, TempJoint.Orientation.y, TempJoint.Orientation.z, TempJoint.Orientation.w);
 
-				POS	= SetANY3DVECTOR4(TempWeight.Position.x, TempWeight.Position.y, TempWeight.Position.z, 0.0f);
+				POS	= XMVectorSet(TempWeight.Position.x, TempWeight.Position.y, TempWeight.Position.z, 0.0f);
 
-				Q2	= QuaternionInverse(Q1);
+				Q2	= XMVectorSet(-TempJoint.Orientation.x, -TempJoint.Orientation.y, -TempJoint.Orientation.z, TempJoint.Orientation.w);
 
-				Rotated = QuaternionMultiply( QuaternionMultiply( Q1, POS ), Q2 );
+				XMStoreFloat4( &Rotated, XMQuaternionMultiply( XMQuaternionMultiply( Q1, POS ), Q2 ) );
 
 				TempVert.pos.x += ( TempJoint.Position.x + Rotated.x ) * TempWeight.Bias;
 				TempVert.pos.y += ( TempJoint.Position.y + Rotated.y ) * TempWeight.Bias;
@@ -1116,11 +1035,9 @@ HRESULT ModelMD5::UpdateVertices(LPDIRECT3DDEVICE9 D3DDevice, int MeshIndex)
 			NewVertices[i].texCoord.y = ModelMeshes[MeshIndex].Vertices[i].texCoord.y;
 		}
 
-		if (FAILED(D3DDevice->CreateVertexBuffer(numMeshVertices[MeshIndex] * sizeof(ANYVERTEX),
-			0, D3DFVF_CUSTOMVERTEX, D3DPOOL_DEFAULT, &ModelVB, NULL)))
-			return E_FAIL;
-
 		int SizeOfVertices = sizeof(ANYVERTEX)*numMeshVertices[MeshIndex];
+		if (FAILED(D3DDevice->CreateVertexBuffer(SizeOfVertices, 0, D3DFVF_CUSTOMVERTEX, D3DPOOL_DEFAULT, &ModelVB, NULL)))
+			return E_FAIL;
 
 		VOID* pVertices;
 		if (FAILED(ModelVB->Lock(0, SizeOfVertices, (void**)&pVertices, 0)))
@@ -1141,7 +1058,6 @@ HRESULT ModelMD5::UpdateVertices(LPDIRECT3DDEVICE9 D3DDevice, int MeshIndex)
 		}
 
 		int SizeOfIndices = sizeof(ANYINDEX)*numMeshIndices[MeshIndex];
-
 		if (FAILED(D3DDevice->CreateIndexBuffer(SizeOfIndices, 0, D3DFMT_INDEX16, D3DPOOL_DEFAULT, &ModelIB, NULL)))
 			return E_FAIL;
 
@@ -1176,11 +1092,9 @@ HRESULT ModelMD5::LoadMeshToDraw(LPDIRECT3DDEVICE9 D3DDevice, int MeshIndex)
 		NewVertices[i].texCoord.y = ModelMeshes[MeshIndex].Vertices[i].texCoord.y;
 	}
 
-	if (FAILED(D3DDevice->CreateVertexBuffer(numMeshVertices[MeshIndex] * sizeof(ANYVERTEX),
-		0, D3DFVF_CUSTOMVERTEX, D3DPOOL_DEFAULT, &ModelVB, NULL)))
-		return E_FAIL;
-
 	int SizeOfVertices = sizeof(ANYVERTEX)*numMeshVertices[MeshIndex];
+	if (FAILED(D3DDevice->CreateVertexBuffer(SizeOfVertices, 0, D3DFVF_CUSTOMVERTEX, D3DPOOL_DEFAULT, &ModelVB, NULL)))
+		return E_FAIL;
 
 	VOID* pVertices;
 	if (FAILED(ModelVB->Lock(0, SizeOfVertices, (void**)&pVertices, 0)))
@@ -1201,7 +1115,6 @@ HRESULT ModelMD5::LoadMeshToDraw(LPDIRECT3DDEVICE9 D3DDevice, int MeshIndex)
 	}
 
 	int SizeOfIndices = sizeof(ANYINDEX)*numMeshIndices[MeshIndex];
-
 	if (FAILED(D3DDevice->CreateIndexBuffer(SizeOfIndices, 0, D3DFMT_INDEX16, D3DPOOL_DEFAULT, &ModelIB, NULL)))
 		return E_FAIL;
 
@@ -1258,4 +1171,224 @@ void ModelMD5::Destroy()
 	}
 
 	return;
+}
+
+
+
+bool ModelMD5::ConvertMeshVersion(char *FileName)
+{
+	// 저장하기
+	FILE*	fpParsed;
+	char NewFileName[260] = {0};
+	char JustName[260] = {0};
+	strcpy_s(NewFileName, FileName);
+	for (int i = 0; i < strlen(NewFileName); i++)
+	{
+		if (NewFileName[i] == '.')
+		{
+			strncpy_s(JustName, NewFileName, i);
+			strcpy_s(NewFileName, JustName);
+			break;
+		}
+	}
+	strcat_s(NewFileName, "R.md5mesh");
+	fpParsed= fopen(NewFileName, "wt");
+
+	fprintf(fpParsed, "MD5Version %d\n", 4843);	// 4843버전으로!
+	fprintf(fpParsed, "commandline \"%s\"\n", "");
+	fprintf(fpParsed, "\n");
+
+	fprintf(fpParsed, "numJoints %d\n", numJoints+1);	// origin 추가니까!!
+	fprintf(fpParsed, "numMeshes %d\n", numMeshes);
+	if (numObjects == 0)
+		numObjects = 1;
+	fprintf(fpParsed, "numObjects %d\n", numObjects);
+	fprintf(fpParsed, "numMaterials %d\n", numMaterials);
+	fprintf(fpParsed, "\n");
+
+	fprintf(fpParsed, "joints {\n");
+	// origin 추가
+	fprintf(fpParsed, "\t\"origin\" %d ( %f %f %f ) ( %f %f %f )\n", -1, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f);
+	for (int i = 0; i < numJoints; i++)
+	{
+		fprintf(fpParsed, "\t\"%s\" %d ( %f %f %f ) ( %f %f %f )\n", ModelJoints[i].Name, ModelJoints[i].ParentID+1,	// origin 추가니까!!
+			ModelJoints[i].Position.x, ModelJoints[i].Position.z, ModelJoints[i].Position.y,
+			ModelJoints[i].Orientation.x, ModelJoints[i].Orientation.z, ModelJoints[i].Orientation.y );
+	}
+	fprintf(fpParsed, "}\n");
+	fprintf(fpParsed, "\n");
+
+	fprintf(fpParsed, "objects {\n");
+	fprintf(fpParsed, "\t\"%s\" %d %d\n", JustName, 0, numMeshes);
+	fprintf(fpParsed, "}\n");
+	fprintf(fpParsed, "\n");
+
+	fprintf(fpParsed, "materials {\n");
+	for (int i = 0; i < numMaterials; i++)
+	{
+		if (ModelMaterials[i].Name[i] == NULL)
+		{
+			char JustName[260] = {0};
+			strcpy_s(JustName, ModelMaterials[i].TextureFileName);
+			for (int i = 0; i < strlen(JustName); i++)
+			{
+				if (JustName[i] == '.')
+				{
+					strncpy_s(JustName, JustName, i);
+					break;
+				}
+			}
+			strcpy_s(ModelMaterials[i].Name, JustName);
+		}
+
+		fprintf(fpParsed, "\t\"%s\" \"%s\" \"\" %d %f\n", ModelMaterials[i].Name, ModelMaterials[i].TextureFileName, 0, 0.0f);
+	}
+	fprintf(fpParsed, "}\n");
+	fprintf(fpParsed, "\n");
+
+	for (int i = 0; i < numMeshes; i++)
+	{
+		fprintf(fpParsed, "mesh {\n");
+		fprintf(fpParsed, "\t//meshes: %s\n", JustName);
+		fprintf(fpParsed, "\tmeshindex %d\n", i);
+		fprintf(fpParsed, "\n", ModelMeshes[i].MaterialName);
+
+		for (int j = 0; j < numMaterials; j++)
+		{
+			if ( FindString(ModelMaterials[i].TextureFileName, ModelMeshes[i].MaterialName) )
+			{
+				strcpy_s(ModelMeshes[i].MaterialName, ModelMaterials[i].Name);
+				break;
+			}
+		}
+
+		fprintf(fpParsed, "\tshader \"%s\"\n", ModelMeshes[i].MaterialName);
+		fprintf(fpParsed, "\n");
+
+		fprintf(fpParsed, "\tnumverts %d\n", numMeshVertices[i]);
+		for (int j = 0; j < numMeshVertices[i]; j++)
+		{
+			fprintf(fpParsed, "\tvert %d ( %f %f ) %d %d \n", j,
+				ModelMeshes[i].Vertices[j].texCoord.x, ModelMeshes[i].Vertices[j].texCoord.y,
+				ModelMeshes[i].VertexWeightStart[j], ModelMeshes[i].VertexNumWeights[j]);
+		}
+		fprintf(fpParsed, "\n");
+
+		fprintf(fpParsed, "\tnumtris %d\n", numMeshIndices[i]);
+		for (int j = 0; j < numMeshIndices[i]; j++)
+		{
+			fprintf(fpParsed, "\ttri %d %d %d %d \n", j,
+				ModelMeshes[i].Indices[j]._0, ModelMeshes[i].Indices[j]._1, ModelMeshes[i].Indices[j]._2);
+		}
+		fprintf(fpParsed, "\n");
+
+		fprintf(fpParsed, "\tnumweights %d\n", numWeights[i]);
+		for (int j = 0; j < numWeights[i]; j++)
+		{
+			fprintf(fpParsed, "\tweight %d %d %f ( %f %f %f )\n", j,
+				ModelMeshes[i].Weights[j].JointID+1, ModelMeshes[i].Weights[j].Bias,	// origin 추가니까!!
+				ModelMeshes[i].Weights[j].Position.x, ModelMeshes[i].Weights[j].Position.z, ModelMeshes[i].Weights[j].Position.y);
+		}
+		fprintf(fpParsed, "\n");
+		fprintf(fpParsed, "\t//YEAH\n");
+		fprintf(fpParsed, "}\n");
+		fprintf(fpParsed, "\n");
+	}
+
+	fclose(fpParsed);
+	return true;
+}
+
+bool ModelMD5::ConvertAnimVersion(char *FileName)
+{
+	// 저장하기
+	FILE*	fpParsed;
+	char NewFileName[260] = {0};
+	char JustName[260] = {0};
+	strcpy_s(NewFileName, FileName);
+	for (int i = 0; i < strlen(NewFileName); i++)
+	{
+		if (NewFileName[i] == '.')
+		{
+			strncpy_s(JustName, NewFileName, i);
+			strcpy_s(NewFileName, JustName);
+			break;
+		}
+	}
+	strcat_s(NewFileName, "R.md5anim");
+	fpParsed= fopen(NewFileName, "wt");
+
+	fprintf(fpParsed, "MD5Version %d\n", 4843);	// 4843버전으로!
+	fprintf(fpParsed, "commandline \"%s\"\n", "");
+	fprintf(fpParsed, "\n");
+
+	fprintf(fpParsed, "numFrames %d\n", ModelAnimation.numFrames);
+	fprintf(fpParsed, "numJoints %d\n", ModelAnimation.numJoints+1);	// origin 추가니까!!
+	fprintf(fpParsed, "frameRate %d\n", ModelAnimation.FrameRate);
+	fprintf(fpParsed, "numAnimatedComponents %d\n", ModelAnimation.numAnimatedComponents);
+	fprintf(fpParsed, "\n");
+
+	fprintf(fpParsed, "hierarchy {\n");
+	// origin 추가
+	fprintf(fpParsed, "\t\"origin\" %d %d %d\n", -1, 0, 0);
+	for (int i = 0; i < numJoints; i++)
+	{
+		fprintf(fpParsed, "\t\"%s\" %d %d %d\n", ModelAnimation.JointInfo[i].Name, ModelAnimation.JointInfo[i].ParentID+1,	// origin 추가니까!!
+			ModelAnimation.JointInfo[i].Flags, ModelAnimation.JointInfo[i].StartIndex);
+	}
+	fprintf(fpParsed, "}\n");
+	fprintf(fpParsed, "\n");
+
+	fprintf(fpParsed, "bounds {\n");
+	for (int i = 0; i < ModelAnimation.numFrames; i++)
+	{
+		fprintf(fpParsed, "\t( %f %f %f ) ( %f %f %f )\n",
+			ModelAnimation.BoundingBoxes[i].Min.x, ModelAnimation.BoundingBoxes[i].Min.z, ModelAnimation.BoundingBoxes[i].Min.y,
+			ModelAnimation.BoundingBoxes[i].Max.x, ModelAnimation.BoundingBoxes[i].Max.z, ModelAnimation.BoundingBoxes[i].Max.y);
+	}
+	fprintf(fpParsed, "}\n");
+	fprintf(fpParsed, "\n");
+
+	fprintf(fpParsed, "baseframe {\n");
+	fprintf(fpParsed, "\t( %f %f %f ) ( %f %f %f )\n", 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f);
+	for (int i = 0; i < ModelAnimation.numJoints+1; i++)	// origin 추가니까!!
+	{
+		fprintf(fpParsed, "\t( %f %f %f ) ( %f %f %f )\n",
+			ModelAnimation.JointBaseFrame[i].Position.x, ModelAnimation.JointBaseFrame[i].Position.z,
+			ModelAnimation.JointBaseFrame[i].Position.y,
+			ModelAnimation.JointBaseFrame[i].Orientation.x, ModelAnimation.JointBaseFrame[i].Orientation.z,
+			ModelAnimation.JointBaseFrame[i].Orientation.y);
+	}
+	fprintf(fpParsed, "}\n");
+	fprintf(fpParsed, "\n");
+
+	for (int i = 0; i < ModelAnimation.numFrames; i++)
+	{
+		fprintf(fpParsed, "frame %d {\n", i);
+
+		for (int j = 0; j < ModelAnimation.numJoints; j++)
+		{
+			int num = 0;
+			if ( j == ModelAnimation.numJoints-1)
+			{
+				num = ModelAnimation.numAnimatedComponents - ModelAnimation.JointInfo[j].StartIndex;
+			}
+			else
+			{
+				num = ModelAnimation.JointInfo[j+1].StartIndex - ModelAnimation.JointInfo[j].StartIndex;
+			}
+
+			fprintf(fpParsed, "\t");
+			for (int k = 0; k < num; k++)
+			{
+				fprintf(fpParsed, "%f ", ModelAnimation.FrameData[i].JointData[ModelAnimation.JointInfo[j].StartIndex+k]);
+			}
+			fprintf(fpParsed, "\n");
+		}
+		fprintf(fpParsed, "}\n");
+		fprintf(fpParsed, "\n");
+	}
+
+	fclose(fpParsed);
+	return true;
 }

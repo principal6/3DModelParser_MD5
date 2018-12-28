@@ -44,6 +44,7 @@ HRESULT InitD3D( HWND hWnd )
 	g_pd3dDevice->SetRenderState( D3DRS_CULLMODE, D3DCULL_NONE );
 	g_pd3dDevice->SetRenderState( D3DRS_LIGHTING, FALSE );
 	g_pd3dDevice->SetRenderState( D3DRS_ZENABLE, TRUE );
+	//g_pd3dDevice->SetRenderState( D3DRS_FILLMODE, D3DFILL_WIREFRAME );
 
 	InitModel();
 
@@ -52,8 +53,20 @@ HRESULT InitD3D( HWND hWnd )
 
 HRESULT InitModel()
 {
-	MyMD5Model.OpenModelFromFile("Female.MD5MESH");
-	MyMD5Model.OpenAnimationFromFile("Female.MD5ANIM");
+	//MyMD5Model.OpenModelFromFile("GuardStandingIdle.MD5MESH");
+	//MyMD5Model.OpenAnimationFromFile("GuardStandingIdle.MD5ANIM");
+
+	MyMD5Model.OpenModelFromFile("LumberJack.MD5MESH");
+	MyMD5Model.OpenAnimationFromFile("LumberJack.MD5ANIM");
+
+	//MyMD5Model.OpenModelFromFile("Female.MD5MESH");
+	//MyMD5Model.OpenAnimationFromFile("Female.MD5ANIM");
+	//MyMD5Model.ConvertMeshVersion("Female.MD5MESH");
+	//MyMD5Model.ConvertAnimVersion("Female.MD5ANIM");
+
+	//MyMD5Model.OpenModelFromFile("twomeshes.MD5MESH");
+	//MyMD5Model.OpenAnimationFromFile("twomeshes.MD5ANIM");
+
 	MyMD5Model.CreateModel(g_pd3dDevice);
 
 	return S_OK;
@@ -79,14 +92,17 @@ VOID SetupMatrices()
 	D3DXMATRIXA16 matSize;
 
 	D3DXMatrixTranslation(&matTrans, 0.0f, 0.0f, 0.0f);
-	//D3DXMatrixTranslation(&matTrans, 0.0f, -500.0f, 0.0f);
+	//D3DXMatrixTranslation(&matTrans, 0.0f, -40.0f, 0.0f);
 	FLOAT fAngle = 0.0f;
 	//fAngle = timeGetTime() / 1000.0f;
 	//fAngle = D3DX_PI;							// 90도 = D3DX_PI * 3 / 4
 	D3DXMatrixRotationY(&matRot, fAngle);		// Y축을 기준으로 회전 (즉, X&Z가 회전함)
-	//D3DXMatrixScaling(&matSize, 0.004f, 0.004f, 0.004f);
-	D3DXMatrixScaling(&matSize, 0.08f, 0.08f, 0.08f);
-	//D3DXMatrixScaling(&matSize, 1.0f, 1.0f, 1.0f);
+	
+	//D3DXMatrixScaling(&matSize, 0.005f, 0.005f, 0.005f);
+	//D3DXMatrixScaling(&matSize, 0.02f, 0.02f, 0.02f);
+	//D3DXMatrixScaling(&matSize, 0.04f, 0.04f, 0.04f);
+	//D3DXMatrixScaling(&matSize, 0.08f, 0.08f, 0.08f);
+	D3DXMatrixScaling(&matSize, 1.0f, 1.0f, 1.0f);
 
 	matWorld = matWorld * matTrans * matRot * matSize;
 
