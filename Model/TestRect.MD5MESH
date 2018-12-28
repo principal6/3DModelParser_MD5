@@ -1,0 +1,46 @@
+MD5Version 4843
+commandline "by HoneyCat md5meshExporter v129"
+
+numJoints 2
+numMeshes 1
+numObjects 1
+numMaterials 1
+
+joints {
+	"origin" -1 ( 0.000000 0.000000 0.000000 ) ( 0.000000 0.000000 0.000000 )
+	"Bone001" 0 ( -40.344276 -0.259840 0.000000 ) ( -0.000000 -0.000000 -0.006097 )
+}
+
+objects {
+	"Rectangle001" 0 1
+}
+
+materials {
+	"Material #25" "Test.PNG" "" 0 0.000000
+}
+
+mesh {
+	// meshes: Rectangle001
+	meshindex 0
+
+	shader "Material #25"
+
+	numverts 4
+	vert 0 ( 1.000000 0.000000 ) 0 1
+	vert 1 ( 0.000000 0.000000 ) 1 1
+	vert 2 ( 0.000000 1.000000 ) 2 1
+	vert 3 ( 1.000000 1.000000 ) 3 1
+
+	numtris 2
+	tri 0 0 2 1
+	tri 1 0 3 2
+
+	numweights 4
+	weight 0 1 1.000000 ( -0.018402 -29.742147 0.000000 )
+	weight 1 1 1.000000 ( 79.975655 -30.717684 0.000000 )
+	weight 2 1 1.000000 ( 80.707306 29.277857 0.000000 )
+	weight 3 1 1.000000 ( -0.713249 30.253393 0.000000 )
+
+	//bones 1
+}
+

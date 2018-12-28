@@ -13,6 +13,8 @@ LPDIRECT3DDEVICE9       g_pd3dDevice	= NULL;
 LPDIRECT3DVERTEXBUFFER9	g_pModelVB		= NULL;
 LPDIRECT3DINDEXBUFFER9	g_pModelIB		= NULL;
 
+D3DLIGHT9				Light_Directional;
+
 D3DXMATRIXA16			matModelWorld;
 D3DXMATRIXA16			matView, matProj;
 
@@ -31,6 +33,7 @@ HRESULT InitD3D( HWND hWnd );
 HRESULT InitModel();
 VOID SetupCameraMatrices();
 VOID SetupModelMatrix(float Tx, float Ty, float Tz, float Rx, float Ry, float Rz, float Sx, float Sy, float Sz);
+VOID SetupLights();
 VOID Render();
 LRESULT WINAPI MsgProc( HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam );
 INT WINAPI WinMain( HINSTANCE hInst, HINSTANCE, LPSTR, INT );
@@ -52,10 +55,9 @@ HRESULT InitD3D( HWND hWnd )
 	if( FAILED( g_pD3D->CreateDevice( D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, hWnd, D3DCREATE_HARDWARE_VERTEXPROCESSING, &d3dpp, &g_pd3dDevice ) ) )
 		return E_FAIL;
 
-	g_pd3dDevice->SetRenderState( D3DRS_CULLMODE, D3DCULL_CCW );
-	g_pd3dDevice->SetRenderState( D3DRS_LIGHTING, FALSE );
+	g_pd3dDevice->SetRenderState( D3DRS_CULLMODE, D3DCULL_NONE );
 	g_pd3dDevice->SetRenderState( D3DRS_ZENABLE, TRUE );
-	g_pd3dDevice->SetRenderState( D3DRS_FILLMODE, D3DFILL_WIREFRAME );
+	//g_pd3dDevice->SetRenderState( D3DRS_FILLMODE, D3DFILL_WIREFRAME );
 
 	InitModel();
 
@@ -107,6 +109,29 @@ VOID SetupModelMatrix(float Tx, float Ty, float Tz, float Rx, float Ry, float Rz
 	g_pd3dDevice->SetTransform(D3DTS_WORLD, &matModelWorld);
 }
 
+VOID SetupLights()
+{
+	// 하얀색의 방향성 조명(Directional Light)을 설정한다.
+	D3DXVECTOR3 vecDir;
+	ZeroMemory( &Light_Directional, sizeof( D3DLIGHT9 ) );
+	Light_Directional.Type = D3DLIGHT_DIRECTIONAL;
+	Light_Directional.Diffuse.r = 1.0f;
+	Light_Directional.Diffuse.g = 1.0f;
+	Light_Directional.Diffuse.b = 1.0f;
+	Light_Directional.Range = 1000.0f;
+	vecDir = D3DXVECTOR3( cosf( timeGetTime() / 350.0f ), 1.0f, sinf( timeGetTime() / 350.0f ) );
+	D3DXVec3Normalize( ( D3DXVECTOR3* )&Light_Directional.Direction, &vecDir );
+
+	g_pd3dDevice->SetLight( 0, &Light_Directional );
+	g_pd3dDevice->LightEnable( 0, TRUE );
+
+	// 환경광을 사용한다.
+	g_pd3dDevice->SetRenderState( D3DRS_AMBIENT, 0x00202020 );
+
+	// 조명 기능을 켠다
+	g_pd3dDevice->SetRenderState( D3DRS_LIGHTING, TRUE );
+}
+
 VOID Render()
 {
 	// 후면 버퍼와 Z 버퍼를 청소한다.
@@ -115,21 +140,22 @@ VOID Render()
 	if( SUCCEEDED( g_pd3dDevice->BeginScene() ) )
 	{
 		SetupCameraMatrices();
+		SetupLights();
 
-		SetupModelMatrix(0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.02f, 0.02f, 0.02f);
-		MyMD5Model[0].Animate(0.01f);
+		SetupModelMatrix(0.0f, -40.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.04f, 0.04f, 0.04f);
+		MyMD5Model[0].Animate(0.02f);
 		MyMD5Model[0].DrawModel(g_pd3dDevice);
 
-		SetupModelMatrix(40.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.02f, 0.02f, 0.02f);
-		MyMD5Model[1].Animate(0.01f);
+		SetupModelMatrix(40.0f, -40.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.04f, 0.04f, 0.04f);
+		MyMD5Model[1].Animate(0.02f);
 		MyMD5Model[1].DrawModel(g_pd3dDevice);
 
-		SetupModelMatrix(-40.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.02f, 0.02f, 0.02f);
-		MyMD5Model[2].Animate(0.01f);
+		SetupModelMatrix(80.0f, -40.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.04f, 0.04f, 0.04f);
+		MyMD5Model[2].Animate(0.02f);
 		MyMD5Model[2].DrawModel(g_pd3dDevice);
 
-		SetupModelMatrix(-80.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.02f, 0.02f, 0.02f);
-		MyMD5Model[3].Animate(0.01f);
+		SetupModelMatrix(120.0f, -40.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.04f, 0.04f, 0.04f);
+		MyMD5Model[3].Animate(0.02f);
 		MyMD5Model[3].DrawModel(g_pd3dDevice);
 
 		g_pd3dDevice->EndScene();

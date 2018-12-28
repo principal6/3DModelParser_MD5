@@ -40,6 +40,15 @@ MD5Mesh			ModelMeshes[MAX_MESHES];
 MD5Animation	ModelAnimation;
 
 
+struct NormalVector
+{
+	XMFLOAT3 V0;
+	XMFLOAT3 V1;
+};
+
+NormalVector	MyNV[MAX_MESHES][MAX_MESH_VERTICES];
+
+
 // 기타 변수
 char		TempString[MAX_PARSE_LINE];
 float		ParseFloats[MAX_PARSE_LINE];
@@ -369,6 +378,7 @@ bool ModelMD5::OpenModelFromFile(char* FileName)
 
 	} // WHILE문 종료!
 
+
 	// 정점 정보 업데이트
 	for (int i = 0; i < numMeshes; i++)
 	{
@@ -377,20 +387,17 @@ bool ModelMD5::OpenModelFromFile(char* FileName)
 			int WeightStart	= ModelMeshes[i].VertexWeightStart[j];
 			int nWeights	= ModelMeshes[i].VertexNumWeights[j];
 
-			XMFLOAT3	Result;
-				Result.x = 0.0f;
-				Result.y = 0.0f;
-				Result.z = 0.0f;
+			XMFLOAT3 Result	= XMFLOAT3(0.0f, 0.0f, 0.0f);
 
 			for (int k = 0; k < nWeights; k++)
 			{
 				int CurJointID = ModelMeshes[i].Weights[WeightStart+k].JointID;
-				
+				MD5Joint	TempJoint	= ModelJoints[CurJointID];
+				MD5Weight	TempWeight	= ModelMeshes[i].Weights[WeightStart+k];
+
 				// 사원수(Quaternion)을 사용해 정점을 회전시킨다. (사원수 * 정점 * 사원수의 역)
 				XMVECTOR	Q1, POS, Q2;
 				XMFLOAT3	Rotated;
-				MD5Joint	TempJoint	= ModelJoints[CurJointID];
-				MD5Weight	TempWeight	= ModelMeshes[i].Weights[WeightStart+k];
 
 				Q1	= XMVectorSet(TempJoint.Orientation.x, TempJoint.Orientation.y, TempJoint.Orientation.z, TempJoint.Orientation.w);
 				POS	= XMVectorSet(TempWeight.Position.x, TempWeight.Position.y, TempWeight.Position.z, 0.0f);
@@ -406,6 +413,101 @@ bool ModelMD5::OpenModelFromFile(char* FileName)
 			ModelMeshes[i].Vertices[j].pos = Result;
 		}
 	}
+
+
+	// 법선 계산 ★★★
+	for (int i = 0; i < numMeshes; i++)
+	{
+		for(int j = 0; j < numMeshVertices[i]; ++j)
+		{
+			ModelMeshes[i].Vertices[j].normal.x = 0.0f;
+			ModelMeshes[i].Vertices[j].normal.y = 0.0f;
+			ModelMeshes[i].Vertices[j].normal.z = 0.0f;
+			MyNV[i][j].V0 = XMFLOAT3(0.0f, 0.0f, 0.0f);
+			MyNV[i][j].V1 = XMFLOAT3(0.0f, 0.0f, 0.0f);
+		}
+	}
+
+	for (int i = 0; i < numMeshes; i++)
+	{
+		XMFLOAT3 tempNormal[MAX_MESH_VERTICES];
+		XMFLOAT3 unnormalized = XMFLOAT3(0.0f, 0.0f, 0.0f);
+
+		float vecX, vecY, vecZ;
+
+		XMVECTOR edge1 = XMVectorSet(0.0f, 0.0f, 0.0f, 0.0f);
+		XMVECTOR edge2 = XMVectorSet(0.0f, 0.0f, 0.0f, 0.0f);
+
+		for(int j = 0; j < numMeshIndices[i]; ++j)
+		{
+			//Get the vector describing one edge of our triangle (edge 0,2)
+			vecX = ModelMeshes[i].Vertices[ModelMeshes[i].Indices[j]._0].pos.x - ModelMeshes[i].Vertices[ModelMeshes[i].Indices[j]._2].pos.x;
+			vecY = ModelMeshes[i].Vertices[ModelMeshes[i].Indices[j]._0].pos.y - ModelMeshes[i].Vertices[ModelMeshes[i].Indices[j]._2].pos.y;
+			vecZ = ModelMeshes[i].Vertices[ModelMeshes[i].Indices[j]._0].pos.z - ModelMeshes[i].Vertices[ModelMeshes[i].Indices[j]._2].pos.z;		
+			edge1 = XMVectorSet(vecX, vecY, vecZ, 0.0f);	//Create our first edge
+
+			//Get the vector describing another edge of our triangle (edge 2,1)
+			vecX = ModelMeshes[i].Vertices[ModelMeshes[i].Indices[j]._2].pos.x - ModelMeshes[i].Vertices[ModelMeshes[i].Indices[j]._1].pos.x;
+			vecY = ModelMeshes[i].Vertices[ModelMeshes[i].Indices[j]._2].pos.y - ModelMeshes[i].Vertices[ModelMeshes[i].Indices[j]._1].pos.y;
+			vecZ = ModelMeshes[i].Vertices[ModelMeshes[i].Indices[j]._2].pos.z - ModelMeshes[i].Vertices[ModelMeshes[i].Indices[j]._1].pos.z;
+			edge2 = XMVectorSet(vecX, vecY, vecZ, 0.0f);	//Create our second edge
+
+			//Cross multiply the two edge vectors to get the un-normalized face normal
+			XMStoreFloat3(&unnormalized, XMVector3Cross(edge1, edge2));
+
+			tempNormal[j] = unnormalized;
+		}
+
+		//Compute vertex normals (normal Averaging)
+		XMVECTOR normalSum = XMVectorSet(0.0f, 0.0f, 0.0f, 0.0f);
+		int facesUsing = 0;
+		float tX, tY, tZ;	//temp axis variables
+
+		for(int j = 0; j < numMeshVertices[i]; ++j)
+		{
+			for(int k = 0; k < numMeshIndices[i]; ++k)
+			{
+				if( ModelMeshes[i].Indices[k]._0 == j || ModelMeshes[i].Indices[k]._1 == j || ModelMeshes[i].Indices[k]._2 == j )
+				{
+					tX = XMVectorGetX(normalSum) + tempNormal[k].x;
+					tY = XMVectorGetY(normalSum) + tempNormal[k].y;
+					tZ = XMVectorGetZ(normalSum) + tempNormal[k].z;
+
+					normalSum = XMVectorSet(tX, tY, tZ, 0.0f);	//If a face is using the vertex, add the unormalized face normal to the normalSum
+
+					facesUsing++;
+				}
+			}
+
+			normalSum = normalSum / (float)facesUsing;
+			normalSum = XMVector3Normalize(normalSum);
+
+			ModelMeshes[i].Vertices[j].normal.x = -XMVectorGetX(normalSum);
+			ModelMeshes[i].Vertices[j].normal.y = -XMVectorGetY(normalSum);
+			ModelMeshes[i].Vertices[j].normal.z = -XMVectorGetZ(normalSum);					
+
+			ANYVERTEX tempVert = ModelMeshes[i].Vertices[j];			// Get the current vertex
+			XMVECTOR normal = XMVectorSet(0.0f, 0.0f, 0.0f, 0.0f);		// Clear normal
+
+			int WeightStart = ModelMeshes[i].VertexWeightStart[j];
+			int nWeights = ModelMeshes[i].VertexNumWeights[j];
+
+			for ( int k = 0; k < nWeights; k++)				// Loop through each of the vertices weights
+			{
+				MD5Joint tempJoint = ModelJoints[ModelMeshes[i].Weights[WeightStart + k].JointID];	// Get the joints orientation
+				XMVECTOR jointOrientation = XMVectorSet(tempJoint.Orientation.x, tempJoint.Orientation.y, tempJoint.Orientation.z, tempJoint.Orientation.w);
+
+				normal = XMQuaternionMultiply(XMQuaternionMultiply(XMQuaternionInverse(jointOrientation), normalSum), jointOrientation);		
+
+				XMStoreFloat3(&ModelMeshes[i].Weights[WeightStart + k].Normal, XMVector3Normalize(normal));			// Store the normalized quaternion into our weights normal
+			}				
+
+			normalSum = XMVectorSet(0.0f, 0.0f, 0.0f, 0.0f);
+			facesUsing = 0;
+		}
+
+	}
+
 
 	fclose(fp);
 
@@ -697,21 +799,21 @@ bool ModelMD5::OpenAnimationFromFile(char* FileName)
 	}
 
 	// 변수 초기화
-	ModelAnimation.FrameTime = 1.0f / ModelAnimation.FrameRate;							// 각 프레임(Frame) 당 시간 설정 ★
-	ModelAnimation.TotalAnimTime = ModelAnimation.numFrames * ModelAnimation.FrameTime;	// 애니메이션 전체 길이
-	ModelAnimation.CurAnimTime = 0.0f;													// 현재 애니메이션 시간을 0으로 초기화
+	FrameTime = 1.0f / ModelAnimation.FrameRate;			// 각 프레임(Frame) 당 시간 설정 ★
+	TotalAnimTime = ModelAnimation.numFrames * FrameTime;	// 애니메이션 전체 길이
+	CurAnimTime = 0.0f;										// 현재 모델의 애니메이션 시간을 0으로 초기화
 
 	return true;
 }
 
 void ModelMD5::Animate(float Speed)
 {
-	ModelAnimation.CurAnimTime += Speed;							// 애니메이션 진행! (숫자로 애니메이션 속도 조절 가능)
+	CurAnimTime += Speed;							// 애니메이션 진행! (숫자로 애니메이션 속도 조절 가능)
 
-	if(ModelAnimation.CurAnimTime > ModelAnimation.TotalAnimTime)	// 애니메이션이 끝나면
-		ModelAnimation.CurAnimTime = 0.0f;							// 다시 처음으로! ★
+	if(CurAnimTime > TotalAnimTime)					// 애니메이션이 끝나면
+		CurAnimTime = 0.0f;							// 다시 처음으로! ★
 
-	float CurrentFrame = ModelAnimation.CurAnimTime * ModelAnimation.FrameRate; // 현재 프레임
+	float CurrentFrame = CurAnimTime * ModelAnimation.FrameRate; // 현재 프레임
 	int Frame0 = (int)floorf( CurrentFrame );		// 보간을 위한 현재 프레임 값
 	int Frame1 = Frame0 + 1;						// 보간을 위한 다음 프레임 값
 
@@ -747,7 +849,8 @@ void ModelMD5::Animate(float Speed)
 		for (int j = 0; j < numMeshVertices[i]; j++)
 		{
 			ANYVERTEX	TempVert = ModelMeshes[i].Vertices[j];
-			memset(&TempVert.pos, 0, sizeof(TempVert.pos));			// 먼저 값을 0으로 초기화!
+			memset(&TempVert.pos, 0, sizeof(TempVert.pos));			// Position 값을 0으로 초기화!
+			memset(&TempVert.normal, 0, sizeof(TempVert.normal));	// Normal 값을 0으로 초기화!
 
 			int WeightStart = ModelMeshes[i].VertexWeightStart[j];
 			int nWeights = ModelMeshes[i].VertexNumWeights[j];
@@ -773,15 +876,31 @@ void ModelMD5::Animate(float Speed)
 				TempVert.pos.x += ( TempJoint.Position.x + Rotated.x ) * TempWeight.Bias;
 				TempVert.pos.y += ( TempJoint.Position.y + Rotated.y ) * TempWeight.Bias;
 				TempVert.pos.z += ( TempJoint.Position.z + Rotated.z ) * TempWeight.Bias;
+
+
+				XMVECTOR TempWeightNormal = XMVectorSet(TempWeight.Normal.x, TempWeight.Normal.y, TempWeight.Normal.z, 0.0f);
+				XMStoreFloat4( &Rotated, XMQuaternionMultiply(XMQuaternionMultiply( Q1, TempWeightNormal), Q2 ) );
+
+				TempVert.normal.x -= Rotated.x * TempWeight.Bias;
+				TempVert.normal.y -= Rotated.y * TempWeight.Bias;
+				TempVert.normal.z -= Rotated.z * TempWeight.Bias;
 			}
 			
 			ModelMeshes[i].Vertices[j].pos = TempVert.pos;
+			ModelMeshes[i].Vertices[j].normal = TempVert.normal;		// Store the vertices normal
+			XMStoreFloat3(&ModelMeshes[i].Vertices[j].normal, XMVector3Normalize(XMLoadFloat3(&ModelMeshes[i].Vertices[j].normal)));
 		}
 	}
 }
 
 HRESULT ModelMD5::UpdateVertices(LPDIRECT3DDEVICE9 D3DDevice, int MeshIndex)
 {
+	if( g_pModelVB != NULL )
+		g_pModelVB->Release();
+
+	if( g_pModelIB != NULL )
+		g_pModelIB->Release();
+
 	// 정점 버퍼 업데이트!
 	ANYVERTEX *NewVertices = new ANYVERTEX[numMeshVertices[MeshIndex]];
 
@@ -792,6 +911,9 @@ HRESULT ModelMD5::UpdateVertices(LPDIRECT3DDEVICE9 D3DDevice, int MeshIndex)
 			NewVertices[i].pos.z = ModelMeshes[MeshIndex].Vertices[i].pos.z;
 			NewVertices[i].texCoord.x = ModelMeshes[MeshIndex].Vertices[i].texCoord.x;
 			NewVertices[i].texCoord.y = ModelMeshes[MeshIndex].Vertices[i].texCoord.y;
+			NewVertices[i].normal.x = ModelMeshes[MeshIndex].Vertices[i].normal.x;
+			NewVertices[i].normal.y = ModelMeshes[MeshIndex].Vertices[i].normal.y;
+			NewVertices[i].normal.z = ModelMeshes[MeshIndex].Vertices[i].normal.z;
 		}
 
 		int SizeOfVertices = sizeof(ANYVERTEX)*numMeshVertices[MeshIndex];
@@ -860,6 +982,15 @@ void ModelMD5::DrawModel(LPDIRECT3DDEVICE9 D3DDevice)
 	for (int i = 0; i < numMeshes; i++)
 	{
 		UpdateVertices(D3DDevice, i);
+
+		// 재질을 설정한다.
+		D3DMATERIAL9 mtrl;
+		ZeroMemory( &mtrl, sizeof( D3DMATERIAL9 ) );
+		mtrl.Diffuse.r = mtrl.Ambient.r = 1.0f;
+		mtrl.Diffuse.g = mtrl.Ambient.g = 1.0f;
+		mtrl.Diffuse.b = mtrl.Ambient.b = 1.0f;
+		mtrl.Diffuse.a = mtrl.Ambient.a = 1.0f;
+		D3DDevice->SetMaterial( &mtrl );
 
 		D3DDevice->SetTexture(0, ModelTextures[i]);
 		D3DDevice->SetStreamSource(0, g_pModelVB, 0, sizeof(ANYVERTEX));
@@ -1028,7 +1159,12 @@ bool FindString(char* val, char* cmp)
 
 bool FindChar(char* val, char* cmp)
 {
-	for (int i = 0; i <= MAX_PARSE_LINE; i++)
+	int iLen = strlen(val);
+
+	if (iLen < 1)
+		return false;
+
+	for (int i = 0; i <= iLen; i++)
 	{
 		if (val[i] == cmp[0])
 			return true;

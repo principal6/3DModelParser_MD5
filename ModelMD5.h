@@ -22,16 +22,15 @@ typedef char	ANYNAME[MAX_NAME_LEN];		// 이름 저장용 변수 유형
 typedef char	KEYWORD[MAX_KEYWORD_LEN];	// 키워드 저장용 변수 유형
 
 
-// 정점 구조체 선언 - 위치(Position), 텍스처 좌표(Texture Coordinates), 법선 벡터(Normal) ★ //
-struct ANYVERTEX
+// 정점 구조체 선언 - 위치(Position), 텍스처 좌표(Texture Coordinates), 법선 벡터(Normal) //
+struct ANYVERTEX	// 순서가 중요하다.. 위치 -> 법선 -> 텍스처 순서!★★★
 {
 	XMFLOAT3 pos;
+	XMFLOAT3 normal;	//
 	XMFLOAT2 texCoord; //텍스처 좌표 ★
-	//XMFLOAT3 normal;
 };
 
-//#define D3DFVF_CUSTOMVERTEX (D3DFVF_XYZ | D3DFVF_TEX1 | D3DFVF_NORMAL)
-#define D3DFVF_CUSTOMVERTEX (D3DFVF_XYZ | D3DFVF_TEX1)
+#define D3DFVF_CUSTOMVERTEX (D3DFVF_XYZ | D3DFVF_NORMAL | D3DFVF_TEX1)
 
 struct ANYINDEX
 {
@@ -51,6 +50,7 @@ struct MD5Weight
 	int				JointID;
 	float			Bias;
 	XMFLOAT3		Position;
+	XMFLOAT3		Normal;
 };
 
 struct MD5Object	// 최신 버전
@@ -111,9 +111,9 @@ struct MD5Animation
 	int FrameRate;
 	int numAnimatedComponents;
 
-	float FrameTime;
-	float TotalAnimTime;
-	float CurAnimTime;
+	//float FrameTime;
+	//float TotalAnimTime;
+	//float CurAnimTime;
 
 	MD5AnimationJointInfo	JointInfo[MAX_JOINTS];
 	MD5BoundingBox			BoundingBoxes[MAX_FRAMES];
@@ -130,6 +130,12 @@ public:
 	int		numMeshVertices[MAX_MESHES];
 	int		numMeshIndices[MAX_MESHES];
 	int		numWeights[MAX_MESHES];
+
+	int		CutAnimIndex;		// 아직 애니메이션 1개...★★
+	float	CurAnimTime;
+	float	TotalAnimTime;
+	float	FrameTime;
+
 	char	BaseDir[MAX_NAME_LEN];
 
 	LPDIRECT3DTEXTURE9		ModelTextures[MAX_MATERIALS];
