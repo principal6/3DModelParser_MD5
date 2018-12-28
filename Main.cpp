@@ -95,11 +95,11 @@ HRESULT InitModel()
 	MyMD5Model[0].CreateAnimation(1, "EzrealPunching", 0.02f);
 	MyMD5Model[0].CreateAnimation(2, "EzrealStanding1HMagicAttack01", 0.02f);
 
-	MyMD5Model[0].AddInstance( XMFLOAT3(0.0f, -4.0f, 0.0f), XMFLOAT3(0.0f, 0.0f, 0.0f), XMFLOAT3(0.1f, 0.1f, 0.1f) );
-	MyMD5Model[0].InstanceSetAnimation(0, 0, 0.0f);
-
-	MyMD5Model[0].AddInstance( XMFLOAT3(10.0f, -4.0f, 0.0f), XMFLOAT3(0.0f, 0.0f, 0.0f), XMFLOAT3(0.1f, 0.1f, 0.1f) );
-	MyMD5Model[0].InstanceSetAnimation(1, 1, 0.0f);
+	for (int i = 0; i < 30; i++)
+	{
+		MyMD5Model[0].AddInstance( XMFLOAT3((float)i * 6, -4.0f, 0.0f), XMFLOAT3(0.0f, 0.0f, 0.0f), XMFLOAT3(0.1f, 0.1f, 0.1f) );
+		MyMD5Model[0].InstanceSetAnimation(i, i % 3, 0.0f);
+	}
 
 	return S_OK;
 }
@@ -110,7 +110,7 @@ VOID SetupCameraMatrices()
 	g_Camera.UseCamera_FreeLook( g_pd3dDevice, &matView );
 	
 	// 투영 행렬(원근감 설정)
-	D3DXMatrixPerspectiveFovLH( &matProj, D3DX_PI/4, 1.0f, 1.0f, 100.0f );
+	D3DXMatrixPerspectiveFovLH( &matProj, D3DX_PI/4, 1.0f, 1.0f, 1000.0f );
 	g_pd3dDevice->SetTransform( D3DTS_PROJECTION, &matProj );
 }
 

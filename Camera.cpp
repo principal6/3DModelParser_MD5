@@ -29,6 +29,67 @@ DirectCamera9::DirectCamera9()
 	CamDefaultTargetY = 0.0f;
 }
 
+VOID DirectCamera9::CreateViewFrustum(D3DXMATRIXA16* matView, D3DXMATRIXA16* matProjection)
+{
+	D3DXMATRIX matVP;
+	D3DXMatrixMultiply( &matVP, matView, matProjection);
+
+	// Left plane
+	ViewFrustum[0].a = matVP._14 + matVP._11;
+	ViewFrustum[0].b = matVP._24 + matVP._21;
+	ViewFrustum[0].c = matVP._34 + matVP._31;
+	ViewFrustum[0].d = matVP._44 + matVP._41;
+ 
+	// Right plane
+	ViewFrustum[1].a = matVP._14 - matVP._11;
+	ViewFrustum[1].b = matVP._24 - matVP._21;
+	ViewFrustum[1].c = matVP._34 - matVP._31;
+	ViewFrustum[1].d = matVP._44 - matVP._41;
+ 
+	// Top plane
+	ViewFrustum[2].a = matVP._14 - matVP._12;
+	ViewFrustum[2].b = matVP._24 - matVP._22;
+	ViewFrustum[2].c = matVP._34 - matVP._32;
+	ViewFrustum[2].d = matVP._44 - matVP._42;
+ 
+	// Bottom plane
+	ViewFrustum[3].a = matVP._14 + matVP._12;
+	ViewFrustum[3].b = matVP._24 + matVP._22;
+	ViewFrustum[3].c = matVP._34 + matVP._32;
+	ViewFrustum[3].d = matVP._44 + matVP._42;
+ 
+	// Near plane
+	ViewFrustum[4].a = matVP._13;
+	ViewFrustum[4].b = matVP._23;
+	ViewFrustum[4].c = matVP._33;
+	ViewFrustum[4].d = matVP._43;
+ 
+	// Far plane
+	ViewFrustum[5].a = matVP._14 - matVP._13;
+	ViewFrustum[5].b = matVP._24 - matVP._23;
+	ViewFrustum[5].c = matVP._34 - matVP._33;
+	ViewFrustum[5].d = matVP._44 - matVP._43;
+ 
+	// Normalize planes
+	for ( int i = 0; i < 6; i++ )
+	{
+		D3DXPlaneNormalize( &ViewFrustum[i], &ViewFrustum[i] );
+	}
+}
+
+bool DirectCamera9::IsSphereInFrustum( D3DXVECTOR3* pPosition, float radius)
+{
+	for ( int i = 0; i < 6; i++ )
+	{
+		if ( D3DXPlaneDotCoord( &ViewFrustum[i], pPosition ) + radius < 0 )
+		{
+			// Outside the frustum, reject it!
+			return false;
+		}
+	}
+	return true;
+}
+
 VOID DirectCamera9::SetCamera_FirstPerson(float CameraY)
 {
 	CamDefaultForward	= D3DXVECTOR3(1.0f, CameraY, 0.0f);

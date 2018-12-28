@@ -32,5 +32,9 @@ public:
 	VOID RotateCamera_UpDown(float MouseMovedY, float SpeedFactor);
 	VOID RotateCamera_UpDownRegular(bool RotateUp, float RotateAngle);
 
+	VOID CreateViewFrustum(D3DXMATRIXA16* matView, D3DXMATRIXA16* matProjection);
+	bool IsSphereInFrustum( D3DXVECTOR3* pPosition, float radius);
+
 private:
+	D3DXPLANE	ViewFrustum[6];
 };

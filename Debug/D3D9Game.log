@@ -1,21 +1,30 @@
-﻿빌드 시작: 2018. 02. 02. (금) 오전 12:54:44
-     1>2 노드의 "C:\Users\JesusKim\Desktop\3DModelParser\MD5Parser v8 최적화2\D3D9Game.vcxproj" 프로젝트(build 대상)입니다.
-       프로젝트 파일에 ToolsVersion="14.0"이(가) 들어 있습니다. 이 도구 집합은 알 수 없거나 누락되었을 수 있습니다. 이 경우 적절한 버전의 MSBuild를 설치하여 이 문제를 해결할 수 있습니다. 그렇지 않으면 빌드가 정책상의 이유로 특정 ToolsVersion이 될 수 있습니다. 프로젝트에 ToolsVersion="4.0"이 들어 있는 것으로 간주합니다. 자세한 내용은 http://go.microsoft.com/fwlink/?LinkId=291333을 참조하십시오.
+﻿빌드 시작: 2018. 02. 14. (수) 오전 12:15:02
+     1>2 노드의 "C:\Users\JesusKim\Desktop\3DModelParser\MD5Parser v17 최적화2\D3D9Game.vcxproj" 프로젝트(build 대상)입니다.
      1>InitializeBuildStatus:
-         "AlwaysCreate"이(가) 지정되었기 때문에 "Debug\D3D9Game.unsuccessfulbuild"을(를) 만들고 있습니다.
+         "Debug\D3D9Game.unsuccessfulbuild"에 연결(touching)하고 있습니다.
        ClCompile:
          모든 출력이 최신 상태입니다.
        ManifestResourceCompile:
          모든 출력이 최신 상태입니다.
        Link:
-         모든 출력이 최신 상태입니다.
+         C:\Program Files (x86)\Microsoft Visual Studio 10.0\VC\bin\link.exe /ERRORREPORT:PROMPT /OUT:"D3D9Game.exe" /INCREMENTAL /NOLOGO d3dxof.lib dxguid.lib d3dx9d.lib d3d9.lib winmm.lib kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib /MANIFEST /ManifestFile:"Debug\D3D9Game.exe.intermediate.manifest" /MANIFESTUAC:"level='asInvoker' uiAccess='false'" /DEBUG /PDB:"C:\Users\JesusKim\Desktop\3DModelParser\MD5Parser v17 최적화2\Debug\D3D9Game.pdb" /SUBSYSTEM:WINDOWS /TLBID:1 /DYNAMICBASE /NXCOMPAT /IMPLIB:"C:\Users\JesusKim\Desktop\3DModelParser\MD5Parser v17 최적화2\Debug\D3D9Game.lib" /MACHINE:X86 Debug\D3D9Game.exe.embed.manifest.res
+         Debug\Camera.obj
+         Debug\DirectInput.obj
+         Debug\Font.obj
+         Debug\Main.obj
+         Debug\ModelMD5.obj
+         Debug\Parser.obj /IGNORE:4089 
        Manifest:
+         C:\Program Files (x86)\Microsoft SDKs\Windows\v7.0A\bin\mt.exe /nologo /verbose /out:"Debug\D3D9Game.exe.embed.manifest" /manifest Debug\D3D9Game.exe.intermediate.manifest
          모든 출력이 최신 상태입니다.
+       LinkEmbedManifest:
+         모든 출력이 최신 상태입니다.
+         D3D9Game.vcxproj -> C:\Users\JesusKim\Desktop\3DModelParser\MD5Parser v17 최적화2\D3D9Game.exe
        FinalizeBuildStatus:
          "Debug\D3D9Game.unsuccessfulbuild" 파일을 삭제하고 있습니다.
          "Debug\D3D9Game.lastbuildstate"에 연결(touching)하고 있습니다.
-     1>"C:\Users\JesusKim\Desktop\3DModelParser\MD5Parser v8 최적화2\D3D9Game.vcxproj" 프로젝트를 빌드했습니다(build 대상).
+     1>"C:\Users\JesusKim\Desktop\3DModelParser\MD5Parser v17 최적화2\D3D9Game.vcxproj" 프로젝트를 빌드했습니다(build 대상).
 
 빌드했습니다.
 
-경과 시간: 00:00:00.09
+경과 시간: 00:00:02.41

@@ -34,11 +34,6 @@ KEYWORD	KeyWords_MD5[] =
 	"frame "				,	// 25 (띄어쓰기가 없으면 frameRate와 혼동됨)★
 };
 
-Joint_MD5		ModelJoints[MAX_JOINTS];
-Object_MD5		ModelObjects[MAX_OBJECTS];
-Material_MD5	ModelMaterials[MAX_MATERIALS];
-Mesh_MD5		ModelMeshes[MAX_MESHES];
-
 
 // 기타 변수
 char		TabChar[] = {'\t'};
@@ -46,33 +41,43 @@ char		TabChar[] = {'\t'};
 
 ModelMD5::ModelMD5()
 {
-	// 변수 초기화
+	// public 멤버 변수 초기화
+	numInstances	= 0;
+	memset(&ModelInstances, 0, sizeof(ModelInstances));
+	memset(MouseOverPerInstances, 0, sizeof(MouseOverPerInstances));
+	memset(DistanceCmp, 0, sizeof(DistanceCmp));
+	memset(PickedPosition, 0, sizeof(PickedPosition));
+
+	memset(BaseDir, 0, sizeof(BaseDir));
+
+
+	// private 멤버 변수 초기화
 	memset(ModelJoints, 0, sizeof(ModelJoints));
 	memset(ModelObjects, 0, sizeof(ModelObjects));
 	memset(ModelMaterials, 0, sizeof(ModelMaterials));
 	memset(ModelMeshes, 0, sizeof(ModelMeshes));
 	memset(&ModelAnimation, 0, sizeof(ModelAnimation));
 
-	memset(&ModelInstances, 0, sizeof(ModelInstances));
-	memset(MouseOverPerInstances, 0, sizeof(MouseOverPerInstances));
-	memset(DistanceCmp, 0, sizeof(DistanceCmp));
-	memset(PickedPosition, 0, sizeof(PickedPosition));
+	Version_MD5		= 0;
 
+	numMeshes		= 0;
 	memset(numMeshVertices, 0, sizeof(numMeshVertices));
 	memset(numMeshIndices, 0, sizeof(numMeshIndices));
-	memset(numWeights, 0, sizeof(numWeights));
+	memset(numMeshWeights, 0, sizeof(numMeshWeights));
 
-	Version_MD5		= 0;
-	numMeshes		= 0;
 	numJoints		= 0;
 	numObjects		= 0;
 	numMaterials	= 0;
+
 	TotalAnimCount	= 0;
-	numInstances	= 0;
+	
 }
 
 ModelMD5::~ModelMD5()
 {
+	SAFE_RELEASE(g_pModelVB);
+	SAFE_RELEASE(g_pModelIB);
+
 	for (int i = 0; i < numMeshes; i++)
 	{
 		SAFE_RELEASE(ModelTextures[i]);
@@ -98,6 +103,22 @@ bool ModelMD5::CreateModel(LPDIRECT3DDEVICE9 D3DDevice, char* BaseDir, char* Fil
 
 	// 바운딩 박스 생성하기
 	CreateMeshBoundingBoxes();
+
+	// 정점 및 색인 버퍼 생성
+	for (int i = 0; i < numMeshes; i++)
+	{
+		int			numVertices = numMeshVertices[i];
+
+		int SizeOfVertices = sizeof(VERTEX_MD5)*numVertices;
+		if (FAILED(D3DDevice->CreateVertexBuffer(SizeOfVertices, D3DUSAGE_DYNAMIC | D3DUSAGE_WRITEONLY, D3DFVF_VERTEX_MD5, D3DPOOL_DEFAULT, &g_pModelVB, NULL)))
+			return E_FAIL;
+
+		int			numIndices = numMeshIndices[i];
+
+		int SizeOfIndices = sizeof(INDEX_MD5)*numIndices;
+		if (FAILED(D3DDevice->CreateIndexBuffer(SizeOfIndices, 0, D3DFMT_INDEX16, D3DPOOL_DEFAULT, &g_pModelIB, NULL)))
+			return E_FAIL;
+	}
 
 	return true;
 }
@@ -448,7 +469,7 @@ bool ModelMD5::OpenMeshFromFile(char* FileName)
 			if ( FindString_MD5(sLine, KeyWords_MD5[17]) )	// numweights
 			{
 				GetFloatFromLine(sLine, " ", TabChar);
-				numWeights[MeshCount-1] = (int)ParseFloats[1];
+				numMeshWeights[MeshCount-1] = (int)ParseFloats[1];
 				continue;
 			}
 			if ( FindString_MD5(sLine, KeyWords_MD5[18]) )	// weight
@@ -1016,62 +1037,28 @@ void ModelMD5::InstanceAnimate(int InstanceID, float Speed)
 
 HRESULT ModelMD5::UpdateVertices(LPDIRECT3DDEVICE9 D3DDevice, int MeshIndex)
 {
-	if( g_pModelVB != NULL )
-		g_pModelVB->Release();
-
-	if( g_pModelIB != NULL )
-		g_pModelIB->Release();
-
 	// 정점 버퍼 업데이트!
-	VERTEX_MD5 *NewVertices = new VERTEX_MD5[numMeshVertices[MeshIndex]];
-
-	for (int i = 0; i < numMeshVertices[MeshIndex]; i++)
-	{
-		NewVertices[i].Position.x = ModelMeshes[MeshIndex].Vertices[i].Position.x;
-		NewVertices[i].Position.y = ModelMeshes[MeshIndex].Vertices[i].Position.y;
-		NewVertices[i].Position.z = ModelMeshes[MeshIndex].Vertices[i].Position.z;
-		NewVertices[i].Texture.x = ModelMeshes[MeshIndex].Vertices[i].Texture.x;
-		NewVertices[i].Texture.y = ModelMeshes[MeshIndex].Vertices[i].Texture.y;
-		NewVertices[i].Normal.x = ModelMeshes[MeshIndex].Vertices[i].Normal.x;
-		NewVertices[i].Normal.y = ModelMeshes[MeshIndex].Vertices[i].Normal.y;
-		NewVertices[i].Normal.z = ModelMeshes[MeshIndex].Vertices[i].Normal.z;
-	}
-
-	int SizeOfVertices = sizeof(VERTEX_MD5)*numMeshVertices[MeshIndex];
-	if (FAILED(D3DDevice->CreateVertexBuffer(SizeOfVertices, 0, D3DFVF_VERTEX_MD5, D3DPOOL_DEFAULT, &g_pModelVB, NULL)))
-		return E_FAIL;
+	int	numVertices		= numMeshVertices[MeshIndex];
+	int SizeOfVertices	= sizeof(VERTEX_MD5)*numVertices;
 
 	VOID* pVertices;
 	if (FAILED(g_pModelVB->Lock(0, SizeOfVertices, (void**)&pVertices, 0)))
 		return E_FAIL;
-	memcpy(pVertices, NewVertices, SizeOfVertices);
+	memcpy(pVertices, ModelMeshes[MeshIndex].Vertices, SizeOfVertices);
 	g_pModelVB->Unlock();
 
-	delete[] NewVertices;
-	NewVertices = NULL;
-
 	// 색인 버퍼 업데이트!
-	INDEX_MD5 *NewIndices = new INDEX_MD5[numMeshIndices[MeshIndex]];
+	int			numIndices = numMeshIndices[MeshIndex];
 
-	for (int i = 0; i < numMeshIndices[MeshIndex]; i++)
-	{
-		NewIndices[i]._0 = ModelMeshes[MeshIndex].Indices[i]._0;
-		NewIndices[i]._1 = ModelMeshes[MeshIndex].Indices[i]._1;
-		NewIndices[i]._2 = ModelMeshes[MeshIndex].Indices[i]._2;
-	}
-
-	int SizeOfIndices = sizeof(INDEX_MD5)*numMeshIndices[MeshIndex];
+	int SizeOfIndices = sizeof(INDEX_MD5)*numIndices;
 	if (FAILED(D3DDevice->CreateIndexBuffer(SizeOfIndices, 0, D3DFMT_INDEX16, D3DPOOL_DEFAULT, &g_pModelIB, NULL)))
 		return E_FAIL;
 
 	VOID* pIndices;
 	if (FAILED(g_pModelIB->Lock(0, SizeOfIndices, (void **)&pIndices, 0)))
 		return E_FAIL;
-	memcpy(pIndices, NewIndices, SizeOfIndices);
+	memcpy(pIndices, ModelMeshes[MeshIndex].Indices, SizeOfIndices);
 	g_pModelIB->Unlock();
-
-	delete[] NewIndices;
-	NewIndices = NULL;
 
 	return S_OK;	// 함수 종료!
 }
@@ -1273,10 +1260,10 @@ HRESULT ModelMD5::DrawNormalVecters(LPDIRECT3DDEVICE9 D3DDevice, float LenFactor
 		INDEX_MD5_NORMAL *NewIndices = new INDEX_MD5_NORMAL[numIndices];
 		int k = 0;
 
-			for (int i = 0; i < numIndices; i++)
+			for (int j = 0; j < numIndices; j++)
 			{
-				NewIndices[i]._0 = k++;
-				NewIndices[i]._1 = k++;
+				NewIndices[j]._0 = k++;
+				NewIndices[j]._1 = k++;
 			}
 
 			int SizeOfIndices = sizeof(INDEX_MD5_NORMAL)*numIndices;

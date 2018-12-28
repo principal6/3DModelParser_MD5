@@ -9,14 +9,10 @@
 #define MAX_MESH_INDICES	9000		// 모델 - 메쉬별 최대 색인 개수		14238
 #define MAX_MESH_WEIGHTS	10000		// 모델 - 메쉬별 최대 가중치 개수	18013
 
-#define MAX_VERTICES		30000		// 모델 - 최대 정점 개수
-#define MAX_INDICES			40000		// 모델 - 최대 색인 개수
-#define MAX_WEIGHTS			50000		// 모델 - 최대 가중치 개수
-
 #define MAX_ANIMATIONS		10			// 모델 - 애니메이션 최대 개수
 #define MAX_FRAMES			160			// 모델 - 애니메이션 최대 프레임
 
-#define MAX_INSTANCES		100			// 모델 - 최대 인스턴스 개수
+#define MAX_INSTANCES		1000		// 모델 - 최대 인스턴스 개수
 
 
 // 정점 구조체 선언 - 위치(Position), 텍스처 좌표(Texture Coordinates), 법선 벡터(Normal) //
@@ -162,16 +158,6 @@ public:
 	ModelMD5();
 	~ModelMD5();
 
-	int						Version_MD5;
-
-	int						numMeshes;
-	int						numMeshVertices[MAX_MESHES];
-	int						numMeshIndices[MAX_MESHES];
-	int						numWeights[MAX_MESHES];
-
-	int						TotalAnimCount;
-	Animation_MD5			ModelAnimation[MAX_ANIMATIONS];
-
 	int						numInstances;
 	Instance_MD5			ModelInstances[MAX_INSTANCES];
 	bool					MouseOverPerInstances[MAX_INSTANCES];
@@ -197,6 +183,7 @@ public:
 	void ModelMD5::DrawModel(LPDIRECT3DDEVICE9 D3DDevice);
 	void ModelMD5::DrawBoundingBoxes(LPDIRECT3DDEVICE9 D3DDevice, int InstanceID);
 	HRESULT ModelMD5::DrawNormalVecters(LPDIRECT3DDEVICE9 D3DDevice, float LenFactor);
+
 	PickingRay ModelMD5::GetPickingRay(LPDIRECT3DDEVICE9 D3DDevice, int MouseX, int MouseY,
 		int ScreenWidth, int ScreenHeight, D3DXMATRIX matView, D3DXMATRIX matProj);
 	bool ModelMD5::CheckMouseOverPerInstance(LPDIRECT3DDEVICE9 D3DDevice, int InstanceID, int MouseX, int MouseY,
@@ -206,7 +193,23 @@ public:
 	HRESULT ModelMD5::UpdateVertices(LPDIRECT3DDEVICE9 D3DDevice, int MeshIndex);
 
 private:
-	int	numJoints;
-	int numObjects;
-	int numMaterials;
+	Joint_MD5		ModelJoints[MAX_JOINTS];
+	Object_MD5		ModelObjects[MAX_OBJECTS];
+	Material_MD5	ModelMaterials[MAX_MATERIALS];
+	Mesh_MD5		ModelMeshes[MAX_MESHES];
+	Animation_MD5	ModelAnimation[MAX_ANIMATIONS];
+
+	int				Version_MD5;
+
+	int				numMeshes;
+	int				numMeshVertices[MAX_MESHES];
+	int				numMeshIndices[MAX_MESHES];
+	int				numMeshWeights[MAX_MESHES];
+
+	int				numJoints;
+	int				numObjects;
+	int				numMaterials;
+
+	int				TotalAnimCount;
+	
 };
