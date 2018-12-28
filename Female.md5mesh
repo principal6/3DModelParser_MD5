@@ -3,8 +3,6 @@ commandline ""
 
 numJoints 23
 numMeshes 2
-numObjects 1
-numMaterials 2
 
 joints {
 	"Bip01"	-1 ( 0.0857263183 0.0000006346 11.3663806915 ) ( 0.0000000000 0.0000000000 0.7071061611 )		//
@@ -32,20 +30,8 @@ joints {
 	"Bip01 R Foot"	21 ( -1.7861242294 -0.2724153518 1.1523467302 ) ( -0.7070467948 0.0092048988 0.7070468902 )		// Bip01 R Calf
 }
 
-objects {
-	"Female" 0 2
-}
-
-materials {
-	"Female_Body" "Body_Tex.bmp" "" 0 0.000000
-	"Female_Head" "Head_Tex.bmp" "" 0 0.000000
-}
-
 mesh {
-
-	meshindex 0
-
-	shader "Female_Body"
+	shader "Body_Tex.bmp"
 
 	numverts 1515
 	vert 0 ( 0.7267000198 0.7073999404 ) 0 1
@@ -6855,10 +6841,7 @@ mesh {
 }
 
 mesh {
-
-	meshindex 1
-
-	shader "Female_Head"
+	shader "Head_Tex.bmp"
 
 	numverts 1311
 	vert 0 ( 0.2856999874 0.5078999996 ) 0 1
