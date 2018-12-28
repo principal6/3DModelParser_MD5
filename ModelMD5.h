@@ -41,8 +41,15 @@ struct VERTEX_MD5_BB
 	XMFLOAT3 Position;
 };
 
+struct VERTEX_MD5_NORMAL
+{
+	XMFLOAT3 Normal;
+};
+
+
 #define D3DFVF_VERTEX_MD5 (D3DFVF_XYZ | D3DFVF_NORMAL | D3DFVF_TEX1)
 #define D3DFVF_VERTEX_MD5_BB (D3DFVF_XYZ)
+#define D3DFVF_VERTEX_MD5_NORMAL (D3DFVF_XYZ)
 
 struct INDEX_MD5
 {
@@ -50,6 +57,11 @@ struct INDEX_MD5
 };
 
 struct INDEX_MD5_BB
+{
+	WORD _0, _1;
+};
+
+struct INDEX_MD5_NORMAL
 {
 	WORD _0, _1;
 };
@@ -191,6 +203,7 @@ public:
 
 	void ModelMD5::DrawModel(LPDIRECT3DDEVICE9 D3DDevice);
 	void ModelMD5::DrawBoundingBoxes(LPDIRECT3DDEVICE9 D3DDevice, int InstanceID);
+	HRESULT ModelMD5::DrawNormalVecters(LPDIRECT3DDEVICE9 D3DDevice, float LenFactor);
 
 	HRESULT ModelMD5::SetTexture(LPDIRECT3DDEVICE9 D3DDevice, int MeshIndex);
 	HRESULT ModelMD5::UpdateVertices(LPDIRECT3DDEVICE9 D3DDevice, int MeshIndex);

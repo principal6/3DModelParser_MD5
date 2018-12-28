@@ -1224,3 +1224,76 @@ void ModelMD5::DrawBoundingBoxes(LPDIRECT3DDEVICE9 D3DDevice, int InstanceID)
 
 	return;
 }
+
+HRESULT ModelMD5::DrawNormalVecters(LPDIRECT3DDEVICE9 D3DDevice, float LenFactor)
+{
+	for (int i = 0; i < numMeshes; i++)
+	{
+
+		if( g_pModelVB != NULL )
+			g_pModelVB->Release();
+
+		if( g_pModelIB != NULL )
+			g_pModelIB->Release();
+
+		int numVertices = numMeshVertices[i] * 2;
+		int numIndices = numVertices / 2;
+
+		// 정점 버퍼 업데이트!
+		VERTEX_MD5_NORMAL *NewVertices = new VERTEX_MD5_NORMAL[numVertices];
+
+			for (int j = 0; j < numVertices; j+=2)
+			{
+				NewVertices[j].Normal.x = ModelMeshes[i].Vertices[j/2].Position.x;
+				NewVertices[j].Normal.y = ModelMeshes[i].Vertices[j/2].Position.y;
+				NewVertices[j].Normal.z = ModelMeshes[i].Vertices[j/2].Position.z;
+				NewVertices[j+1].Normal.x = NewVertices[j].Normal.x + ModelMeshes[i].Vertices[j/2].Normal.x * LenFactor;
+				NewVertices[j+1].Normal.y = NewVertices[j].Normal.y + ModelMeshes[i].Vertices[j/2].Normal.y * LenFactor;
+				NewVertices[j+1].Normal.z = NewVertices[j].Normal.z + ModelMeshes[i].Vertices[j/2].Normal.z * LenFactor;
+			}
+
+			int SizeOfVertices = sizeof(VERTEX_MD5_NORMAL)*numVertices;
+			if (FAILED(D3DDevice->CreateVertexBuffer(SizeOfVertices, 0, D3DFVF_VERTEX_MD5_NORMAL, D3DPOOL_DEFAULT, &g_pModelVB, NULL)))
+				return E_FAIL;
+	
+			VOID* pVertices;
+			if (FAILED(g_pModelVB->Lock(0, SizeOfVertices, (void**)&pVertices, 0)))
+				return E_FAIL;
+			memcpy(pVertices, NewVertices, SizeOfVertices);
+			g_pModelVB->Unlock();
+
+		delete[] NewVertices;
+
+
+		// 색인 버퍼 업데이트!
+		INDEX_MD5_NORMAL *NewIndices = new INDEX_MD5_NORMAL[numIndices];
+		int k = 0;
+
+			for (int i = 0; i < numIndices; i++)
+			{
+				NewIndices[i]._0 = k++;
+				NewIndices[i]._1 = k++;
+			}
+
+			int SizeOfIndices = sizeof(INDEX_MD5_NORMAL)*numIndices;
+			if (FAILED(D3DDevice->CreateIndexBuffer(SizeOfIndices, 0, D3DFMT_INDEX16, D3DPOOL_DEFAULT, &g_pModelIB, NULL)))
+				return E_FAIL;
+
+			VOID* pIndices;
+			if (FAILED(g_pModelIB->Lock(0, SizeOfIndices, (void **)&pIndices, 0)))
+				return E_FAIL;
+			memcpy(pIndices, NewIndices, SizeOfIndices);
+			g_pModelIB->Unlock();
+	
+		delete[] NewIndices;
+
+		D3DDevice->SetStreamSource(0, g_pModelVB, 0, sizeof(VERTEX_MD5_NORMAL));
+		D3DDevice->SetFVF(D3DFVF_VERTEX_MD5_NORMAL);
+		D3DDevice->SetIndices(g_pModelIB);
+
+		D3DDevice->DrawIndexedPrimitive(D3DPT_LINELIST, 0, 0, numVertices, 0, numIndices);
+
+	}
+
+	return S_OK;	// 함수 종료!
+}

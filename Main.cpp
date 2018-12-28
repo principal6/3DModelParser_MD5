@@ -95,10 +95,10 @@ HRESULT InitModel()
 	MyMD5Model[0].CreateAnimation(1, "EzrealPunching", 0.02f);
 	MyMD5Model[0].CreateAnimation(2, "EzrealStanding1HMagicAttack01", 0.02f);
 
-	MyMD5Model[0].AddInstance( XMFLOAT3(-40.0f, -40.0f, 0.0f), XMFLOAT3(0.0f, 0.0f, 0.0f), XMFLOAT3(0.04f, 0.04f, 0.04f) );
+	MyMD5Model[0].AddInstance( XMFLOAT3(0.0f, -4.0f, 0.0f), XMFLOAT3(0.0f, 0.0f, 0.0f), XMFLOAT3(0.1f, 0.1f, 0.1f) );
 	MyMD5Model[0].InstanceSetAnimation(0, 0, 0.0f);
 
-	MyMD5Model[0].AddInstance( XMFLOAT3(40.0f, -40.0f, 0.0f), XMFLOAT3(0.0f, 0.0f, 0.0f), XMFLOAT3(0.04f, 0.04f, 0.04f) );
+	MyMD5Model[0].AddInstance( XMFLOAT3(10.0f, -4.0f, 0.0f), XMFLOAT3(0.0f, 0.0f, 0.0f), XMFLOAT3(0.1f, 0.1f, 0.1f) );
 	MyMD5Model[0].InstanceSetAnimation(1, 1, 0.0f);
 
 	return S_OK;
@@ -131,14 +131,14 @@ VOID SetupModelMatrix(XMFLOAT3 Translation, XMFLOAT3 Rotation, XMFLOAT3 Scaling)
 		D3DXMatrixRotationZ(&matRotZ, Rotation.z);
 		D3DXMatrixScaling(&matSize, Scaling.x, Scaling.y, Scaling.z);
 
-	matModelWorld = matModelWorld * matTrans * matRotX * matRotY * matRotZ * matSize;
+	matModelWorld = matModelWorld * matRotX * matRotY * matRotZ * matSize * matTrans;
 	g_pd3dDevice->SetTransform(D3DTS_WORLD, &matModelWorld);
 }
 
 VOID SetupLights()
 {
 	// 환경광을 사용한다.
-	g_pd3dDevice->SetRenderState( D3DRS_AMBIENT, 0xffA0A0A0 );
+	g_pd3dDevice->SetRenderState( D3DRS_AMBIENT, 0xffffffff );
 
 	// 조명 기능을 켠다
 	g_pd3dDevice->SetRenderState( D3DRS_LIGHTING, TRUE );
@@ -261,8 +261,13 @@ VOID Render()
 				MyMD5Model[0].ModelInstances[i].Rotation,
 				MyMD5Model[0].ModelInstances[i].Scaling);
 			MyMD5Model[0].InstanceAnimate(i, 0.0f);
+
 			if (bDrawBoundingBoxes == true)
 				MyMD5Model[0].DrawBoundingBoxes(g_pd3dDevice, i);
+
+			if (bDrawNormalVectors == true)
+				MyMD5Model[0].DrawNormalVecters(g_pd3dDevice, 2.0f);
+
 			MyMD5Model[0].DrawModel(g_pd3dDevice);
 		}
 
