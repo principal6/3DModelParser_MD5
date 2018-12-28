@@ -38,6 +38,28 @@ KEYWORD	KeyWords_MD5[] =
 char		TabChar[] = {'\t'};
 
 
+struct INSTANCE_DATA_MD5
+{
+	XMFLOAT4	matModelWorld0;
+	XMFLOAT4	matModelWorld1;
+	XMFLOAT4	matModelWorld2;
+	XMFLOAT4	matModelWorld3;
+	float		bAnimated;
+};
+
+D3DVERTEXELEMENT9 g_VBElements[] =
+{
+    { 0, 0,			D3DDECLTYPE_FLOAT3,	D3DDECLMETHOD_DEFAULT,	D3DDECLUSAGE_POSITION,	0 },
+    { 0, 4 * 3,		D3DDECLTYPE_FLOAT3,	D3DDECLMETHOD_DEFAULT,	D3DDECLUSAGE_NORMAL,	0 },
+    { 0, 4 * 6,		D3DDECLTYPE_FLOAT2,	D3DDECLMETHOD_DEFAULT,	D3DDECLUSAGE_TEXCOORD,	0 },
+    { 1, 0,			D3DDECLTYPE_FLOAT4,	D3DDECLMETHOD_DEFAULT,	D3DDECLUSAGE_POSITION,	1 },
+	{ 1, 4 * 4,		D3DDECLTYPE_FLOAT4,	D3DDECLMETHOD_DEFAULT,	D3DDECLUSAGE_POSITION,	2 },
+	{ 1, 4 * 8,		D3DDECLTYPE_FLOAT4,	D3DDECLMETHOD_DEFAULT,	D3DDECLUSAGE_POSITION,	3 },
+	{ 1, 4 * 12,	D3DDECLTYPE_FLOAT4,	D3DDECLMETHOD_DEFAULT,	D3DDECLUSAGE_POSITION,	4 },
+	{ 1, 4 * 16,	D3DDECLTYPE_FLOAT1,	D3DDECLMETHOD_DEFAULT,	D3DDECLUSAGE_PSIZE,		0 },
+    D3DDECL_END()
+};
+
 ModelMD5::ModelMD5()
 {
 	// public 멤버 변수 초기화
@@ -84,6 +106,8 @@ ModelMD5::~ModelMD5()
 	{
 		SAFE_RELEASE(ModelTextures[i]);
 	}
+
+	SAFE_RELEASE(g_pVBDeclaration);
 }
 
 HRESULT ModelMD5::CreateModel(LPDIRECT3DDEVICE9 D3DDevice, char* BaseDir, char* FileNameWithoutExtension)
@@ -96,7 +120,6 @@ HRESULT ModelMD5::CreateModel(LPDIRECT3DDEVICE9 D3DDevice, char* BaseDir, char* 
 	strcpy_s(NewFileName, FileNameWithoutExtension);
 	strcat_s(NewFileName, ".MD5MESH");
 	OpenMeshFromFile(NewFileName);
-
 
 	// 모델용 정점 및 색인 버퍼 생성
 	SAFE_RELEASE(g_pModelVB);
@@ -111,7 +134,6 @@ HRESULT ModelMD5::CreateModel(LPDIRECT3DDEVICE9 D3DDevice, char* BaseDir, char* 
 	if (FAILED(D3DDevice->CreateIndexBuffer(SizeOfIndices, D3DUSAGE_DYNAMIC | D3DUSAGE_WRITEONLY,
 		D3DFMT_INDEX16, D3DPOOL_DEFAULT, &g_pModelIB, NULL)))
 		return E_FAIL;
-
 
 	// 노멀 벡터용 정점 및 색인 버퍼 생성
 	SAFE_RELEASE(g_pNVVB);
@@ -129,7 +151,6 @@ HRESULT ModelMD5::CreateModel(LPDIRECT3DDEVICE9 D3DDevice, char* BaseDir, char* 
 	if (FAILED(D3DDevice->CreateIndexBuffer(SizeOfNIndices, D3DUSAGE_DYNAMIC | D3DUSAGE_WRITEONLY,
 		D3DFMT_INDEX16, D3DPOOL_DEFAULT, &g_pNVIB, NULL)))
 		return E_FAIL;
-
 
 	// 모델 텍스처 불러오기
 	SetTexture(D3DDevice, 0);
@@ -196,8 +217,8 @@ bool ModelMD5::CreateAnimation(int AnimationID, char* AnimationFileName, float A
 	strcat_s(NewFileName, ".MD5ANIM");
 	OpenAnimationFromFile(AnimationID, NewFileName);
 
-	if (AnimationSpeed <= 0.0f)
-		AnimationSpeed = 0.02f;
+	if (AnimationSpeed <= 0.0f)	// 애니메이션 속도 미지정 시
+		AnimationSpeed = 0.02f;	// 기본 애니메이션 속도 지정
 
 	ModelAnimation[AnimationID].BasicAnimSpeed = AnimationSpeed;
 
@@ -217,7 +238,7 @@ bool ModelMD5::InstanceSetAnimation(int InstanceID, int AnimationID, float Start
 	if (StartAnimTime > ModelAnimation[AnimationID].TotalAnimTime)
 		StartAnimTime = 0;
 
-	if (StartAnimTime < 0)	// -값이 들어오면 시작 시간은 초기화하지 않는다.
+	if (StartAnimTime < 0)	// (-)값이 들어오면 시작 시간은 초기화하지 않는다.
 		return true;
 
 	ModelInstances[InstanceID].CurAnimTime = StartAnimTime;
@@ -231,9 +252,7 @@ void ModelMD5::AddInstance(XMFLOAT3 Translation, XMFLOAT3 Rotation, XMFLOAT3 Sca
 
 	memset(&ModelInstances[numInstances-1], 0, sizeof(ModelInstances[numInstances-1]));
 
-	ModelInstances[numInstances-1].Translation = Translation;
-	ModelInstances[numInstances-1].Rotation = Rotation;
-	ModelInstances[numInstances-1].Scaling = Scaling;
+	SetInstance(numInstances-1, Translation, Rotation, Scaling);
 
 	return;
 }
@@ -244,7 +263,84 @@ void ModelMD5::SetInstance(int InstanceID, XMFLOAT3 Translation, XMFLOAT3 Rotati
 	ModelInstances[InstanceID].Rotation = Rotation;
 	ModelInstances[InstanceID].Scaling = Scaling;
 
+	// 월드 행렬(위치, 회전, 크기 설정)
+	D3DXMatrixIdentity( &matModelWorld[InstanceID] );
+
+		D3DXMATRIXA16 matTrans;
+		D3DXMATRIXA16 matRotX;
+		D3DXMATRIXA16 matRotY;
+		D3DXMATRIXA16 matRotZ;
+		D3DXMATRIXA16 matSize;
+
+		D3DXMatrixTranslation(&matTrans, Translation.x, Translation.y, Translation.z);
+		D3DXMatrixRotationX(&matRotX, Rotation.x);
+		D3DXMatrixRotationY(&matRotY, Rotation.y);				// Y축을 기준으로 회전 (즉, X&Z가 회전함)
+		D3DXMatrixRotationZ(&matRotZ, Rotation.z);
+		D3DXMatrixScaling(&matSize, Scaling.x, Scaling.y, Scaling.z);
+
+	matModelWorld[InstanceID] = matModelWorld[InstanceID] * matRotX * matRotY * matRotZ * matSize * matTrans;
+
 	return;
+}
+
+void ModelMD5::CreateInstanceVB(LPDIRECT3DDEVICE9 D3DDevice)
+{
+	SAFE_RELEASE(g_pVBDeclaration);
+	SAFE_RELEASE(g_pModelInstanceVB);
+
+	D3DDevice->CreateVertexDeclaration( g_VBElements, &g_pVBDeclaration );
+	D3DDevice->CreateVertexBuffer( numInstances * sizeof( INSTANCE_DATA_MD5 ), 0,
+		0, D3DPOOL_MANAGED, &g_pModelInstanceVB, 0 );
+}
+
+void ModelMD5::UpdateInstanceVB(LPDIRECT3DDEVICE9 D3DDevice)
+{
+	INSTANCE_DATA_MD5* pIDATA;
+	HRESULT hr = g_pModelInstanceVB->Lock( 0, NULL, ( void** )&pIDATA, 0 );
+
+	if( SUCCEEDED( hr ) )
+	{
+		for (int i = 0; i < numInstances; i++)
+		{
+			INSTANCE_DATA_MD5 InstanceModel;
+			memset(&InstanceModel, 0, sizeof(InstanceModel));
+
+			// 인스턴스 정보 대입 (인스턴스의 월드 행렬)
+			InstanceModel.matModelWorld0.x = matModelWorld[i]._11;
+			InstanceModel.matModelWorld0.y = matModelWorld[i]._12;
+			InstanceModel.matModelWorld0.z = matModelWorld[i]._13;
+			InstanceModel.matModelWorld0.w = matModelWorld[i]._14;
+
+			InstanceModel.matModelWorld1.x = matModelWorld[i]._21;
+			InstanceModel.matModelWorld1.y = matModelWorld[i]._22;
+			InstanceModel.matModelWorld1.z = matModelWorld[i]._23;
+			InstanceModel.matModelWorld1.w = matModelWorld[i]._24;
+
+			InstanceModel.matModelWorld2.x = matModelWorld[i]._31;
+			InstanceModel.matModelWorld2.y = matModelWorld[i]._32;
+			InstanceModel.matModelWorld2.z = matModelWorld[i]._33;
+			InstanceModel.matModelWorld2.w = matModelWorld[i]._34;
+
+			InstanceModel.matModelWorld3.x = matModelWorld[i]._41;
+			InstanceModel.matModelWorld3.y = matModelWorld[i]._42;
+			InstanceModel.matModelWorld3.z = matModelWorld[i]._43;
+			InstanceModel.matModelWorld3.w = matModelWorld[i]._44;
+
+			switch (ModelInstances[i].BeingAnimated)
+			{
+			case true:
+				InstanceModel.bAnimated = 1; // 0이면 정지, 1이면 애니메이션 ★
+				break;
+			case false:
+				InstanceModel.bAnimated = 0; // 0이면 정지, 1이면 애니메이션 ★
+				break;
+			}
+
+			*pIDATA = InstanceModel, pIDATA++;
+		}
+
+		g_pModelInstanceVB->Unlock();
+	}
 }
 
 void ModelMD5::SetBaseDirection(char* Dir)
@@ -1175,25 +1271,37 @@ void ModelMD5::DrawModel_HLSL(LPDIRECT3DDEVICE9 D3DDevice, LPD3DXEFFECT HLSL)
 	memcpy(pIndices, TIndices, SizeOfIndices);
 	g_pModelIB->Unlock();
 
+	D3DDevice->SetVertexDeclaration( g_pVBDeclaration );
 
-	// 재질을 설정한다.
-	/*
-	D3DMATERIAL9 mtrl;
-	ZeroMemory( &mtrl, sizeof( D3DMATERIAL9 ) );
-		mtrl.Diffuse.r = mtrl.Ambient.r = 1.0f;
-		mtrl.Diffuse.g = mtrl.Ambient.g = 1.0f;
-		mtrl.Diffuse.b = mtrl.Ambient.b = 1.0f;
-		mtrl.Diffuse.a = mtrl.Ambient.a = 1.0f;
-	D3DDevice->SetMaterial( &mtrl );
-	*/
+	D3DDevice->SetStreamSource( 0, g_pModelVB, 0, sizeof( VERTEX_MD5 ) );
+	D3DDevice->SetStreamSourceFreq( 0, D3DSTREAMSOURCE_INDEXEDDATA | numInstances );
 
-	HLSL->SetTexture("DiffuseMap_Tex", ModelTextures[0]);	// 일단 0번으로 통일해서 그리자 ★★
+	D3DDevice->SetStreamSource( 1, g_pModelInstanceVB, 0, sizeof( INSTANCE_DATA_MD5 ) );
+	D3DDevice->SetStreamSourceFreq( 1, D3DSTREAMSOURCE_INSTANCEDATA | 1ul );
 
-	D3DDevice->SetStreamSource(0, g_pModelVB, 0, sizeof(VERTEX_MD5));
-	D3DDevice->SetFVF(D3DFVF_VERTEX_MD5);
-	D3DDevice->SetIndices(g_pModelIB);
+	D3DDevice->SetIndices( g_pModelIB );
 
-	D3DDevice->DrawIndexedPrimitive(D3DPT_TRIANGLELIST, 0, 0, numTVertices, 0, numTIndices);
+	HLSL->SetTechnique("HLSLMain");
+
+	UINT numPasses = 0;
+	HLSL->Begin(&numPasses, NULL);
+
+		for (UINT i = 0; i < numPasses; ++i)
+		{
+			HLSL->BeginPass(i);
+
+			HLSL->SetTexture("DiffuseMap_Tex", ModelTextures[0]);	// 일단 0번으로 통일해서 그리자 ★★
+			HLSL->CommitChanges();
+
+			D3DDevice->DrawIndexedPrimitive(D3DPT_TRIANGLELIST, 0, 0, numTVertices, 0, numTIndices);
+
+			HLSL->EndPass();
+		}
+
+	HLSL->End();
+
+	D3DDevice->SetStreamSourceFreq( 0, 1 );
+	D3DDevice->SetStreamSourceFreq( 1, 1 );
 
 	for (int i = 0; i < numInstances; i++)
 	{
@@ -1203,12 +1311,12 @@ void ModelMD5::DrawModel_HLSL(LPDIRECT3DDEVICE9 D3DDevice, LPD3DXEFFECT HLSL)
 	return;
 }
 
-void ModelMD5::DrawBoundingBoxes(LPDIRECT3DDEVICE9 D3DDevice, int InstanceID)
+void ModelMD5::DrawBoundingBoxes(LPDIRECT3DDEVICE9 D3DDevice)
 {
 	XMFLOAT3	BaseBoundingBoxMax;
 	XMFLOAT3	BaseBoundingBoxMin;
 
-	if (ModelInstances[InstanceID].BeingAnimated == false)
+	if (ModelInstances[0].BeingAnimated == false)
 	{
 		BaseBoundingBoxMax = TBB.Max;
 		BaseBoundingBoxMin = TBB.Min;
@@ -1408,28 +1516,9 @@ bool ModelMD5::CheckMouseOverPerInstance(LPDIRECT3DDEVICE9 D3DDevice, int Instan
 		p2 = D3DXVECTOR3(TVertices[ID2].Position.x, TVertices[ID2].Position.y, TVertices[ID2].Position.z);
 
 		// 인스턴스
-		D3DXMATRIX matInstTrans;
-		D3DXMATRIX matInstRotX;
-		D3DXMATRIX matInstRotY;
-		D3DXMATRIX matInstRotZ;
-		D3DXMATRIX matInstScal;
-		D3DXMATRIX matInstWorld;
-
-		D3DXMatrixTranslation(&matInstTrans,
-			ModelInstances[InstanceID].Translation.x, ModelInstances[InstanceID].Translation.y, ModelInstances[InstanceID].Translation.z);
-
-		D3DXMatrixRotationX(&matInstRotX, ModelInstances[InstanceID].Rotation.x);
-		D3DXMatrixRotationY(&matInstRotY, ModelInstances[InstanceID].Rotation.y);
-		D3DXMatrixRotationZ(&matInstRotZ, ModelInstances[InstanceID].Rotation.z);
-
-		D3DXMatrixScaling(&matInstScal,
-			ModelInstances[InstanceID].Scaling.x, ModelInstances[InstanceID].Scaling.y, ModelInstances[InstanceID].Scaling.z);
-				
-		matInstWorld = matInstRotX * matInstRotY * matInstRotZ * matInstScal * matInstTrans;
-
-		D3DXVec3TransformCoord(&p0, &p0, &matInstWorld);
-		D3DXVec3TransformCoord(&p1, &p1, &matInstWorld);
-		D3DXVec3TransformCoord(&p2, &p2, &matInstWorld);
+		D3DXVec3TransformCoord(&p0, &p0, &matModelWorld[InstanceID]);
+		D3DXVec3TransformCoord(&p1, &p1, &matModelWorld[InstanceID]);
+		D3DXVec3TransformCoord(&p2, &p2, &matModelWorld[InstanceID]);
 
 		float pU, pV, pDist;
 
@@ -1439,7 +1528,7 @@ bool ModelMD5::CheckMouseOverPerInstance(LPDIRECT3DDEVICE9 D3DDevice, int Instan
 			{
 				DistanceCmp[InstanceID] = pDist;
 				D3DXVECTOR3 TempPosition = p0 + (p1*pU - p0*pU) + (p2*pV - p0*pV);
-				D3DXVec3TransformCoord(&TempPosition, &TempPosition, &matInstWorld);
+				D3DXVec3TransformCoord(&TempPosition, &TempPosition, &matModelWorld[InstanceID]);
 
 				PickedPosition[InstanceID].x = TempPosition.x;
 				PickedPosition[InstanceID].y = TempPosition.y;

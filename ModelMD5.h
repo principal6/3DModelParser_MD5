@@ -153,6 +153,8 @@ public:
 	
 	int				numInstances;
 	Instance_MD5	ModelInstances[MAX_INSTANCES];
+	D3DXMATRIXA16	matModelWorld[MAX_INSTANCES];
+
 	bool			MouseOverPerInstances[MAX_INSTANCES];
 	float			DistanceCmp[MAX_INSTANCES];
 	XMFLOAT3		PickedPosition[MAX_INSTANCES];
@@ -174,9 +176,12 @@ public:
 	void ModelMD5::AddInstance(XMFLOAT3 Translation, XMFLOAT3 Rotation, XMFLOAT3 Scaling);
 	void ModelMD5::SetInstance(int InstanceID, XMFLOAT3 Translation, XMFLOAT3 Rotation, XMFLOAT3 Scaling);
 
+	void ModelMD5::CreateInstanceVB(LPDIRECT3DDEVICE9 D3DDevice);
+	void ModelMD5::UpdateInstanceVB(LPDIRECT3DDEVICE9 D3DDevice);
+
 	void ModelMD5::DrawModel(LPDIRECT3DDEVICE9 D3DDevice);
 	void ModelMD5::DrawModel_HLSL(LPDIRECT3DDEVICE9 D3DDevice, LPD3DXEFFECT HLSL);
-	void ModelMD5::DrawBoundingBoxes(LPDIRECT3DDEVICE9 D3DDevice, int InstanceID);
+	void ModelMD5::DrawBoundingBoxes(LPDIRECT3DDEVICE9 D3DDevice);
 	HRESULT ModelMD5::DrawNormalVecters(LPDIRECT3DDEVICE9 D3DDevice, float LenFactor);
 	PickingRay ModelMD5::GetPickingRay(LPDIRECT3DDEVICE9 D3DDevice, int MouseX, int MouseY,
 		int ScreenWidth, int ScreenHeight, D3DXMATRIX matView, D3DXMATRIX matProj);
@@ -214,4 +219,6 @@ private:
 
 	BoundingBox_MD5	TBB;
 	BoundingBox_MD5	TBB_Animed;
+
+	LPDIRECT3DVERTEXDECLARATION9	g_pVBDeclaration;
 };
