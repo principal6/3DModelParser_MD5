@@ -1,4 +1,5 @@
 #include "ModelMD5.h"
+#include "Parser.h"
 
 KEYWORD	MD5KeyWords[] =
 {
@@ -12,7 +13,7 @@ KEYWORD	MD5KeyWords[] =
 	"joints"		,	// 6
 	"objects"		,	// 7
 	"materials"		,	// 8
-	"mesh "			,	// 9 ★★
+	"mesh "			,	// 9 (띄어쓰기가 없으면 meshindex와 혼동됨)★
 	"//"			,	// 10
 	"meshindex"		,	// 11
 	"shader"		,	// 12
@@ -30,60 +31,124 @@ KEYWORD	MD5KeyWords[] =
 	"hierarchy"				,	// 22
 	"bounds"				,	// 23
 	"baseframe"				,	// 24
-	"frame "				,	// 25 ★
+	"frame "				,	// 25 (띄어쓰기가 없으면 frameRate와 혼동됨)★
 };
 
 MD5Joint		ModelJoints[MAX_JOINTS];
 MD5Object		ModelObjects[MAX_OBJECTS];
 MD5Material		ModelMaterials[MAX_MATERIALS];
 MD5Mesh			ModelMeshes[MAX_MESHES];
-MD5Animation	ModelAnimation;
-
-
-struct NormalVector
-{
-	XMFLOAT3 V0;
-	XMFLOAT3 V1;
-};
-
-NormalVector	MyNV[MAX_MESHES][MAX_MESH_VERTICES];
 
 
 // 기타 변수
-char		TempString[MAX_PARSE_LINE];
-float		ParseFloats[MAX_PARSE_LINE];
 char		TabChar[] = {'\t'};
 
 
-// 함수 원형 선언!
+// 함수 원형 선언
 char*	StringTrim(char* sBuf);
 char*	SplitString(char* String, char* SplitChar, int SplitIndex);
 char*	GetNameBetweenBraces(char* val);
 char*	GetNameBetweenQuotes(char* val);
-bool	FindString(char* val, char* cmp);
+bool	FindString_MD5(char* val, char* cmp);
 bool	FindChar(char* val, char cmp[]);
 void	GetFloatFromLine(char* line, char* split, char* splita);
 
 
-bool ModelMD5::OpenAndCreateAtOnce(LPDIRECT3DDEVICE9 D3DDevice, char* BaseDir, char* FileNameWithoutExtension)
+bool ModelMD5::CreateModel(LPDIRECT3DDEVICE9 D3DDevice, char* BaseDir, char* FileNameWithoutExtension)
 {
+	// 변수 초기화
+	memset(ModelJoints, 0, sizeof(ModelJoints));
+	memset(ModelObjects, 0, sizeof(ModelObjects));
+	memset(ModelMaterials, 0, sizeof(ModelMaterials));
+	memset(ModelMeshes, 0, sizeof(ModelMeshes));
+	memset(&ModelAnimation, 0, sizeof(ModelAnimation));
+	memset(&ModelInstances, 0, sizeof(ModelInstances));
+
+	memset(numMeshVertices, 0, sizeof(numMeshVertices));
+	memset(numMeshIndices, 0, sizeof(numMeshIndices));
+	memset(numWeights, 0, sizeof(numWeights));
+
+	MD5Version		= 0;
+	numMeshes		= 0;
+	numJoints		= 0;
+	numObjects		= 0;
+	numMaterials	= 0;
+	TotalAnimCount	= 0;
+	numInstances	= 0;
+
+	// 모델 파일이 있는 폴더 설정
 	SetBaseDirection(BaseDir);
 
+	// 모델 메쉬 불러오기
 	char	NewFileName[MAX_NAME_LEN] = {0};
-	strcpy_s(NewFileName, FileNameWithoutExtension);
-	strcat_s(NewFileName, ".MD5MESH");
+		strcpy_s(NewFileName, FileNameWithoutExtension);
+		strcat_s(NewFileName, ".MD5MESH");
+	OpenMeshFromFile(NewFileName);
 
-	OpenModelFromFile(NewFileName);
-
-	memset(NewFileName, 0, sizeof(NewFileName));
-	strcpy_s(NewFileName, FileNameWithoutExtension);
-	strcat_s(NewFileName, ".MD5ANIM");
-
-	OpenAnimationFromFile(NewFileName);
-
-	CreateModel(D3DDevice);
+	// 모델 텍스처 불러오기
+	for (int i = 0; i < numMeshes; i++)
+	{
+		SetTexture(D3DDevice, i);
+	}
 
 	return true;
+}
+
+bool ModelMD5::CreateAnimation(int AnimationID, char* AnimationFileName, float AnimationSpeed)
+{
+	// 모델 애니메이션 불러오기
+	char	NewFileName[MAX_NAME_LEN] = {0};
+		memset(NewFileName, 0, sizeof(NewFileName));
+		strcat_s(NewFileName, AnimationFileName);
+		strcat_s(NewFileName, ".MD5ANIM");
+	OpenAnimationFromFile(AnimationID, NewFileName);
+
+	if (AnimationSpeed <= 0.0f)
+		AnimationSpeed = 0.02f;
+
+	ModelAnimation[AnimationID].BasicAnimSpeed = AnimationSpeed;
+
+	// 애니메이션 개수 1개 증가
+	TotalAnimCount++;
+
+	return true;
+}
+
+bool ModelMD5::InstanceSetAnimation(int InstanceID, int AnimationID, float StartAnimTime)
+{
+	if (AnimationID > TotalAnimCount)
+		AnimationID = 0;
+
+	ModelInstances[InstanceID].CurAnimID = AnimationID;
+
+	if (StartAnimTime > ModelAnimation[AnimationID].TotalAnimTime)
+		StartAnimTime = 0;
+
+	ModelInstances[InstanceID].CurAnimTime = StartAnimTime;
+
+	return true;
+}
+
+void ModelMD5::AddInstance(XMFLOAT3 Translation, XMFLOAT3 Rotation, XMFLOAT3 Scaling)
+{
+	numInstances++;
+
+	memset(&ModelInstances[numInstances-1], 0, sizeof(ModelInstances[numInstances-1]));
+
+	ModelInstances[numInstances-1].Translation = Translation;
+	ModelInstances[numInstances-1].Rotation = Rotation;
+	ModelInstances[numInstances-1].Scaling = Scaling;
+
+	return;
+}
+
+void ModelMD5::SetInstance(int InstanceID, XMFLOAT3 Translation, XMFLOAT3 Rotation, XMFLOAT3 Scaling)
+{
+	ModelInstances[InstanceID].Translation = Translation;
+	ModelInstances[InstanceID].Rotation = Rotation;
+	ModelInstances[InstanceID].Scaling = Scaling;
+
+	return;
 }
 
 void ModelMD5::SetBaseDirection(char* Dir)
@@ -92,7 +157,7 @@ void ModelMD5::SetBaseDirection(char* Dir)
 	return;
 }
 
-bool ModelMD5::OpenModelFromFile(char* FileName)
+bool ModelMD5::OpenMeshFromFile(char* FileName)
 {
 	FILE*	fp;									// 불러올 파일
 	char	sLine[MAX_PARSE_LINE] = {0};		// 파일에서 읽어올 한 줄
@@ -103,21 +168,6 @@ bool ModelMD5::OpenModelFromFile(char* FileName)
 
 	if( fopen_s(&fp, NewFileName, "rt") )
 		return false;
-
-	memset(ModelJoints, 0, sizeof(ModelJoints));
-	memset(ModelObjects, 0, sizeof(ModelObjects));
-	memset(ModelMaterials, 0, sizeof(ModelMaterials));
-	memset(ModelMeshes, 0, sizeof(ModelMeshes));
-	memset(&ModelAnimation, 0, sizeof(ModelAnimation));
-
-	MD5Version = 0;
-	numMeshes = 0;
-	memset(numMeshVertices, 0, sizeof(numMeshVertices));
-	memset(numMeshIndices, 0, sizeof(numMeshIndices));
-	numJoints = 0;
-	memset(numWeights, 0, sizeof(numWeights));
-	numObjects = 0;
-	numMaterials = 0;
 
 	char	CurKey[MAX_KEYWORD_LEN] = {0};
 	int		CurKeyCount = 0;
@@ -134,68 +184,68 @@ bool ModelMD5::OpenModelFromFile(char* FileName)
 
 
 		// 중괄호 열기 전
-		if ( FindString(sLine, MD5KeyWords[0]) )	// MD5Version 4843 & MD5Version 10 지원 ★★
+		if ( FindString_MD5(sLine, MD5KeyWords[0]) )	// MD5Version 4843 & MD5Version 10 지원 ★★
 		{
 			GetFloatFromLine(sLine, " ", TabChar);
 			MD5Version = (int)ParseFloats[1];
 			continue;
 		}
 
-		if ( FindString(sLine, MD5KeyWords[1]) )	// commandline "~"
+		if ( FindString_MD5(sLine, MD5KeyWords[1]) )	// commandline "~"
 		{
 			continue;								// 주석은 건너뛰자
 		}
 
-		if ( FindString(sLine, MD5KeyWords[2]) )	// numJoints ~
+		if ( FindString_MD5(sLine, MD5KeyWords[2]) )	// numJoints ~
 		{
 			GetFloatFromLine(sLine, " ", TabChar);
 			numJoints = (int)ParseFloats[1];
 			continue;
 		}
 
-		if ( FindString(sLine, MD5KeyWords[3]) )	// numMeshes ~
+		if ( FindString_MD5(sLine, MD5KeyWords[3]) )	// numMeshes ~
 		{
 			GetFloatFromLine(sLine, " ", TabChar);
 			numMeshes = (int)ParseFloats[1];
 			continue;
 		}
 
-		if ( FindString(sLine, MD5KeyWords[4]) )	// numObjects ~
+		if ( FindString_MD5(sLine, MD5KeyWords[4]) )	// numObjects ~
 		{
 			GetFloatFromLine(sLine, " ", TabChar);
 			numObjects = (int)ParseFloats[1];
 			continue;
 		}
 
-		if ( FindString(sLine, MD5KeyWords[5]) )	// numMaterials ~
+		if ( FindString_MD5(sLine, MD5KeyWords[5]) )	// numMaterials ~
 		{
 			GetFloatFromLine(sLine, " ", TabChar);
 			numMaterials = (int)ParseFloats[1];
 			continue;
 		}
 
-		if ( FindString(sLine, MD5KeyWords[6]) )	// joints {
+		if ( FindString_MD5(sLine, MD5KeyWords[6]) )	// joints {
 		{
 			strcpy_s(CurKey, MD5KeyWords[6]);		// 중괄호 열림!
 			CurKeyCount = 0;
 			continue;
 		}
 
-		if ( FindString(sLine, MD5KeyWords[7]) )	// objects {
+		if ( FindString_MD5(sLine, MD5KeyWords[7]) )	// objects {
 		{
 			strcpy_s(CurKey, MD5KeyWords[7]);		// 중괄호 열림!
 			CurKeyCount = 0;
 			continue;
 		}
 
-		if ( FindString(sLine, MD5KeyWords[8]) )	// materials {
+		if ( FindString_MD5(sLine, MD5KeyWords[8]) )	// materials {
 		{
 			strcpy_s(CurKey, MD5KeyWords[8]);		// 중괄호 열림!
 			CurKeyCount = 0;
 			continue;
 		}
 
-		if ( FindString(sLine, MD5KeyWords[9]) )	// mesh {
+		if ( FindString_MD5(sLine, MD5KeyWords[9]) )	// mesh {
 		{
 			MeshCount++;
 			strcpy_s(CurKey, MD5KeyWords[9]);		// 중괄호 열림!
@@ -205,7 +255,7 @@ bool ModelMD5::OpenModelFromFile(char* FileName)
 
 
 		// 중괄호 열린 상태
-		if ( FindString(CurKey, MD5KeyWords[6]) )	// joints {
+		if ( FindString_MD5(CurKey, MD5KeyWords[6]) )	// joints {
 		{
 			CurKeyCount++;
 
@@ -258,7 +308,7 @@ bool ModelMD5::OpenModelFromFile(char* FileName)
 			continue;
 		}
 
-		if ( FindString(CurKey, MD5KeyWords[7]) )		// objects {
+		if ( FindString_MD5(CurKey, MD5KeyWords[7]) )		// objects {
 		{
 			CurKeyCount++;
 			strcpy_s( ModelObjects[CurKeyCount-1].Name, GetNameBetweenQuotes(sLine) );
@@ -273,7 +323,7 @@ bool ModelMD5::OpenModelFromFile(char* FileName)
 			continue;
 		}
 
-		if ( FindString(CurKey, MD5KeyWords[8]) )		// materials {
+		if ( FindString_MD5(CurKey, MD5KeyWords[8]) )		// materials {
 		{
 			CurKeyCount++;
 			strcpy_s( ModelMaterials[CurKeyCount-1].Name, SplitString(sLine, "\"", 0) );
@@ -285,22 +335,22 @@ bool ModelMD5::OpenModelFromFile(char* FileName)
 			continue;
 		}
 
-		if ( FindString(CurKey, MD5KeyWords[9]) )		// mesh {
+		if ( FindString_MD5(CurKey, MD5KeyWords[9]) )		// mesh {
 		{
-			if ( FindString(sLine, MD5KeyWords[10]) )	// '//' 주석 줄
+			if ( FindString_MD5(sLine, MD5KeyWords[10]) )	// '//' 주석 줄
 				continue;								// 건너뛰자!
 
-			if ( FindString(sLine, MD5KeyWords[11]) )	// meshindex
+			if ( FindString_MD5(sLine, MD5KeyWords[11]) )	// meshindex
 				continue;
 
-			if ( FindString(sLine, MD5KeyWords[12]) )	// shader
+			if ( FindString_MD5(sLine, MD5KeyWords[12]) )	// shader
 			{
 				if ( MD5Version == 4843 )	// 신버전이면 material의 이름이 나옴!★
 				{
 					strcpy_s( ModelMeshes[MeshCount-1].MaterialName, SplitString(sLine, "\"", 1) );
 					for (int i = 0; i < numMaterials; i++)
 					{
-						if ( FindString( ModelMeshes[MeshCount-1].MaterialName, ModelMaterials[i].Name) )
+						if ( FindString_MD5( ModelMeshes[MeshCount-1].MaterialName, ModelMaterials[i].Name) )
 							strcpy_s( ModelMaterials[MeshCount-1].TextureFileName,  ModelMaterials[i].TextureFileName );
 					}
 				}
@@ -313,14 +363,14 @@ bool ModelMD5::OpenModelFromFile(char* FileName)
 
 				continue;
 			}
-			if ( FindString(sLine, MD5KeyWords[13]) )	// numverts
+			if ( FindString_MD5(sLine, MD5KeyWords[13]) )	// numverts
 			{
 				GetFloatFromLine(sLine, " ", TabChar);
 				numMeshVertices[MeshCount-1] = (int)ParseFloats[1];
 
 				continue;
 			}
-			if ( FindString(sLine, MD5KeyWords[14]) )	// vert
+			if ( FindString_MD5(sLine, MD5KeyWords[14]) )	// vert
 			{
 				GetFloatFromLine(sLine, " ", TabChar);
 				int VIndex = (int)ParseFloats[1];
@@ -332,14 +382,14 @@ bool ModelMD5::OpenModelFromFile(char* FileName)
 
 				continue;
 			}
-			if ( FindString(sLine, MD5KeyWords[15]) )	// numtris
+			if ( FindString_MD5(sLine, MD5KeyWords[15]) )	// numtris
 			{
 				GetFloatFromLine(sLine, " ", TabChar);
 				numMeshIndices[MeshCount-1] = (int)ParseFloats[1];
 
 				continue;
 			}
-			if ( FindString(sLine, MD5KeyWords[16]) )	// tri
+			if ( FindString_MD5(sLine, MD5KeyWords[16]) )	// tri
 			{
 				GetFloatFromLine(sLine, " ", TabChar);
 				int TIndex = (int)ParseFloats[1];
@@ -350,13 +400,13 @@ bool ModelMD5::OpenModelFromFile(char* FileName)
 
 				continue;
 			}
-			if ( FindString(sLine, MD5KeyWords[17]) )	// numweights
+			if ( FindString_MD5(sLine, MD5KeyWords[17]) )	// numweights
 			{
 				GetFloatFromLine(sLine, " ", TabChar);
 				numWeights[MeshCount-1] = (int)ParseFloats[1];
 				continue;
 			}
-			if ( FindString(sLine, MD5KeyWords[18]) )	// weight
+			if ( FindString_MD5(sLine, MD5KeyWords[18]) )	// weight
 			{
 				GetFloatFromLine(sLine, " ", TabChar);
 				int WIndex = (int)ParseFloats[1];
@@ -423,8 +473,6 @@ bool ModelMD5::OpenModelFromFile(char* FileName)
 			ModelMeshes[i].Vertices[j].normal.x = 0.0f;
 			ModelMeshes[i].Vertices[j].normal.y = 0.0f;
 			ModelMeshes[i].Vertices[j].normal.z = 0.0f;
-			MyNV[i][j].V0 = XMFLOAT3(0.0f, 0.0f, 0.0f);
-			MyNV[i][j].V1 = XMFLOAT3(0.0f, 0.0f, 0.0f);
 		}
 	}
 
@@ -514,7 +562,7 @@ bool ModelMD5::OpenModelFromFile(char* FileName)
 	return true;
 }
 
-bool ModelMD5::OpenAnimationFromFile(char* FileName)
+bool ModelMD5::OpenAnimationFromFile(int AnimationID, char* FileName)
 {
 	FILE*	fp;									// 불러올 파일
 	char	sLine[MAX_PARSE_LINE] = {0};		// 파일에서 읽어올 한 줄
@@ -541,64 +589,64 @@ bool ModelMD5::OpenAnimationFromFile(char* FileName)
 			continue;
 
 		// 중괄호 열기 전
-		if ( FindString(sLine, MD5KeyWords[0]) )	// MD5Version 4843 & 10
+		if ( FindString_MD5(sLine, MD5KeyWords[0]) )	// MD5Version 4843 & 10
 		{
 			GetFloatFromLine(sLine, " ", TabChar);
 			// if ( MD5Version != (int)ParseFloats[1]);	// 모델과 애니메이션의 버전이 달라도 그냥 불러와 보자..
 			continue;
 		}
 
-		if ( FindString(sLine, MD5KeyWords[1]) )	// commandline "~"
+		if ( FindString_MD5(sLine, MD5KeyWords[1]) )	// commandline "~"
 		{
 			continue;								// 주석은 건너뛰자
 		}
 
-		if ( FindString(sLine, MD5KeyWords[19]) )	// numFrames ~
+		if ( FindString_MD5(sLine, MD5KeyWords[19]) )	// numFrames ~
 		{
 			GetFloatFromLine(sLine, " ", TabChar);
-			ModelAnimation.numFrames = (int)ParseFloats[1];
+			ModelAnimation[AnimationID].numFrames = (int)ParseFloats[1];
 			continue;
 		}
 
-		if ( FindString(sLine, MD5KeyWords[2]) )	// numJoints ~
+		if ( FindString_MD5(sLine, MD5KeyWords[2]) )	// numJoints ~
 		{
 			GetFloatFromLine(sLine, " ", TabChar);
-			ModelAnimation.numJoints = (int)ParseFloats[1];
-			if (ModelAnimation.numJoints != numJoints)	// 애니메이션의 numJoints가 불러온 모델의 numJoints와 다를 경우
-				return false;							// 불러오기를 중단한다. ★★
+			ModelAnimation[AnimationID].numJoints = (int)ParseFloats[1];
+			if (ModelAnimation[AnimationID].numJoints != numJoints)	// 애니메이션의 numJoints가 불러온 모델의 numJoints와 다를 경우
+				return false;										// 불러오기를 중단한다. ★★
 			continue;
 		}
-		if ( FindString(sLine, MD5KeyWords[20]) )	// frameRate ~
+		if ( FindString_MD5(sLine, MD5KeyWords[20]) )	// frameRate ~
 		{
 			GetFloatFromLine(sLine, " ", TabChar);
-			ModelAnimation.FrameRate = (int)ParseFloats[1];
+			ModelAnimation[AnimationID].FrameRate = (int)ParseFloats[1];
 			continue;
 		}
-		if ( FindString(sLine, MD5KeyWords[21]) )	// numAnimatedComponents ~
+		if ( FindString_MD5(sLine, MD5KeyWords[21]) )	// numAnimatedComponents ~
 		{
 			GetFloatFromLine(sLine, " ", TabChar);
-			ModelAnimation.numAnimatedComponents = (int)ParseFloats[1];
+			ModelAnimation[AnimationID].numAnimatedComponents = (int)ParseFloats[1];
 			continue;
 		}
-		if ( FindString(sLine, MD5KeyWords[22]) )	// hierarchy {
+		if ( FindString_MD5(sLine, MD5KeyWords[22]) )	// hierarchy {
 		{
 			strcpy_s(CurKey, MD5KeyWords[22]);		// 중괄호 열림!
 			CurKeyCount = 0;
 			continue;
 		}
-		if ( FindString(sLine, MD5KeyWords[23]) )	// bounds {
+		if ( FindString_MD5(sLine, MD5KeyWords[23]) )	// bounds {
 		{
 			strcpy_s(CurKey, MD5KeyWords[23]);		// 중괄호 열림!
 			CurKeyCount = 0;
 			continue;
 		}
-		if ( FindString(sLine, MD5KeyWords[24]) )	// baseframe {
+		if ( FindString_MD5(sLine, MD5KeyWords[24]) )	// baseframe {
 		{
 			strcpy_s(CurKey, MD5KeyWords[24]);		// 중괄호 열림!
 			CurKeyCount = 0;
 			continue;
 		}
-		if ( FindString(sLine, MD5KeyWords[25]) )	// frame ~ {
+		if ( FindString_MD5(sLine, MD5KeyWords[25]) )	// frame ~ {
 		{
 			FrameCount++;
 			GetFloatFromLine(sLine, " ", TabChar);
@@ -611,7 +659,7 @@ bool ModelMD5::OpenAnimationFromFile(char* FileName)
 
 
 		// 중괄호 열린 상태
-		if ( FindString(CurKey, MD5KeyWords[22]) )	// hierarchy {
+		if ( FindString_MD5(CurKey, MD5KeyWords[22]) )	// hierarchy {
 		{
 			CurKeyCount++;
 
@@ -619,7 +667,7 @@ bool ModelMD5::OpenAnimationFromFile(char* FileName)
 			char tempName[MAX_NAME_LEN];
 			memset(tempName, 0, sizeof(tempName));
 			strcpy_s( tempName, SplitString(sLine, "\"", 0) );
-			strcpy_s( ModelAnimation.JointInfo[CurKeyCount-1].Name, tempName );
+			strcpy_s( ModelAnimation[AnimationID].JointInfo[CurKeyCount-1].Name, tempName );
 			int	tempLen = strlen(tempName) + 2;		// 이름 & 앞뒤 쌍따옴표 제거하기 위함
 
 			char tempLine[MAX_PARSE_LINE];
@@ -631,17 +679,17 @@ bool ModelMD5::OpenAnimationFromFile(char* FileName)
 			}
 			
 			GetFloatFromLine(tempLine, " ", TabChar);
-			ModelAnimation.JointInfo[CurKeyCount-1].ParentID	= (int)ParseFloats[0];
-			ModelAnimation.JointInfo[CurKeyCount-1].Flags		= (int)ParseFloats[1];
-			ModelAnimation.JointInfo[CurKeyCount-1].StartIndex	= (int)ParseFloats[2];
+			ModelAnimation[AnimationID].JointInfo[CurKeyCount-1].ParentID	= (int)ParseFloats[0];
+			ModelAnimation[AnimationID].JointInfo[CurKeyCount-1].Flags		= (int)ParseFloats[1];
+			ModelAnimation[AnimationID].JointInfo[CurKeyCount-1].StartIndex	= (int)ParseFloats[2];
 
-			if (CurKeyCount >= ModelAnimation.numJoints)
+			if (CurKeyCount >= ModelAnimation[AnimationID].numJoints)
 				memset(CurKey, 0, sizeof(CurKey));	// 중괄호 닫기
 
 			continue;
 		}
 
-		if ( FindString(CurKey, MD5KeyWords[23]) )	// bounds {
+		if ( FindString_MD5(CurKey, MD5KeyWords[23]) )	// bounds {
 		{
 			CurKeyCount++;
 			GetFloatFromLine(sLine, " ", TabChar);
@@ -655,15 +703,15 @@ bool ModelMD5::OpenAnimationFromFile(char* FileName)
 				TempBB.Max.z	= ParseFloats[7];	// 3DSMAX -> DIRECTX 좌표계!★
 				TempBB.Max.y	= ParseFloats[8];
 
-			ModelAnimation.BoundingBoxes[CurKeyCount-1] = TempBB;
+			ModelAnimation[AnimationID].BoundingBoxes[CurKeyCount-1] = TempBB;
 
-			if (CurKeyCount >= ModelAnimation.numFrames)
+			if (CurKeyCount >= ModelAnimation[AnimationID].numFrames)
 				memset(CurKey, 0, sizeof(CurKey));	// 중괄호 닫기
 
 			continue;
 		}
 
-		if ( FindString(CurKey, MD5KeyWords[24]) )	// baseframe {
+		if ( FindString_MD5(CurKey, MD5KeyWords[24]) )	// baseframe {
 		{
 			// BASEFRAME: Joint 개수만큼 존재, 각 Frame의 기반이 되는 위치!★
 			CurKeyCount++;
@@ -679,33 +727,33 @@ bool ModelMD5::OpenAnimationFromFile(char* FileName)
 				TempBaseFrame.Orientation.z		= ParseFloats[7];	// 3DSMAX -> DIRECTX 좌표계!★
 				TempBaseFrame.Orientation.y		= ParseFloats[8];
 
-			ModelAnimation.JointBaseFrame[CurKeyCount-1] = TempBaseFrame;
+			ModelAnimation[AnimationID].JointBaseFrame[CurKeyCount-1] = TempBaseFrame;
 
-			if (CurKeyCount >= ModelAnimation.numJoints)
+			if (CurKeyCount >= ModelAnimation[AnimationID].numJoints)
 				memset(CurKey, 0, sizeof(CurKey));	// 중괄호 닫기
 
 			continue;
 		}
 
-		if ( FindString(CurKey, MD5KeyWords[25]) )	// frame ~ {
+		if ( FindString_MD5(CurKey, MD5KeyWords[25]) )	// frame ~ {
 		{
 			// FRAME: 각 Frame이 Baseframe에서 변화한 위치!★
 			MD5Frame	TempFrameData;
 			memset(&TempFrameData, 0, sizeof(TempFrameData));
 			TempFrameData.FrameID = TempFrameID;
 
-			for(int i = 0; i < ModelAnimation.numJoints; i++)
+			for(int i = 0; i < ModelAnimation[AnimationID].numJoints; i++)
 			{
-				if (ModelAnimation.JointInfo[i].Flags == 0)	 // 플래그가 0이면 건너뛰자!★
+				if (ModelAnimation[AnimationID].JointInfo[i].Flags == 0)	 // 플래그가 0이면 건너뛰자!★
 					continue;
 
 				GetFloatFromLine(sLine, " ", TabChar);
 
-				int k = ModelAnimation.JointInfo[i].StartIndex;
+				int k = ModelAnimation[AnimationID].JointInfo[i].StartIndex;
 
-				if (ModelAnimation.numAnimatedComponents < 6)
+				if (ModelAnimation[AnimationID].numAnimatedComponents < 6)
 				{
-					for (int j = 0; j < ModelAnimation.numAnimatedComponents; j++)
+					for (int j = 0; j < ModelAnimation[AnimationID].numAnimatedComponents; j++)
 					{
 						TempFrameData.JointData[k++] = ParseFloats[j];
 					}
@@ -724,32 +772,32 @@ bool ModelMD5::OpenAnimationFromFile(char* FileName)
 				strcpy_s(sLine, StringTrim(sLine));	// 앞 뒤 공백 제거
 			}
 
-			ModelAnimation.FrameData[FrameCount-1] = TempFrameData;
+			ModelAnimation[AnimationID].FrameData[FrameCount-1] = TempFrameData;
 
 
-			for (int i = 0; i < ModelAnimation.numJoints; i++)
+			for (int i = 0; i < ModelAnimation[AnimationID].numJoints; i++)
 			{
-				MD5Joint TempFrameJoint = ModelAnimation.JointBaseFrame[i];	// 기본적으로 좌표는 BaseFrame 값에서 출발!
-				TempFrameJoint.ParentID = ModelAnimation.JointInfo[i].ParentID;
+				MD5Joint TempFrameJoint = ModelAnimation[AnimationID].JointBaseFrame[i];	// 기본적으로 좌표는 BaseFrame 값에서 출발!
+				TempFrameJoint.ParentID = ModelAnimation[AnimationID].JointInfo[i].ParentID;
 				
-				int tempJointIDStart = ModelAnimation.JointInfo[i].StartIndex;
+				int tempJointIDStart = ModelAnimation[AnimationID].JointInfo[i].StartIndex;
 
-				if(ModelAnimation.JointInfo[i].Flags & 1)	//	Position.x	( 000001 )
+				if(ModelAnimation[AnimationID].JointInfo[i].Flags & 1)	//	Position.x	( 000001 )
 					TempFrameJoint.Position.x		= TempFrameData.JointData[tempJointIDStart++];
 
-				if(ModelAnimation.JointInfo[i].Flags & 2)	//	Position.y	( 000010 )
+				if(ModelAnimation[AnimationID].JointInfo[i].Flags & 2)	//	Position.y	( 000010 )
 					TempFrameJoint.Position.z		= TempFrameData.JointData[tempJointIDStart++];	// 3DSMAX -> DIRECTX 좌표계!★
 
-				if(ModelAnimation.JointInfo[i].Flags & 4)	//	Position.z	( 000100 )
+				if(ModelAnimation[AnimationID].JointInfo[i].Flags & 4)	//	Position.z	( 000100 )
 					TempFrameJoint.Position.y		= TempFrameData.JointData[tempJointIDStart++];
 
-				if(ModelAnimation.JointInfo[i].Flags & 8)	//	Orientation.x	( 001000 )
+				if(ModelAnimation[AnimationID].JointInfo[i].Flags & 8)	//	Orientation.x	( 001000 )
 					TempFrameJoint.Orientation.x	= TempFrameData.JointData[tempJointIDStart++];
 
-				if(ModelAnimation.JointInfo[i].Flags & 16)	//	Orientation.y	( 010000 )
+				if(ModelAnimation[AnimationID].JointInfo[i].Flags & 16)	//	Orientation.y	( 010000 )
 					TempFrameJoint.Orientation.z	= TempFrameData.JointData[tempJointIDStart++];	// 3DSMAX -> DIRECTX 좌표계!★
 
-				if(ModelAnimation.JointInfo[i].Flags & 32)	//	Orientation.z	( 100000 )
+				if(ModelAnimation[AnimationID].JointInfo[i].Flags & 32)	//	Orientation.z	( 100000 )
 					TempFrameJoint.Orientation.y	= TempFrameData.JointData[tempJointIDStart];
 
 				// 회전을 위한 사원수(Quaternion) w값 생성
@@ -767,7 +815,7 @@ bool ModelMD5::OpenAnimationFromFile(char* FileName)
 
 				if (TempFrameJoint.ParentID >= 0)	// 루트 프레임(ParentID = -1)이 아닌 경우, 부모->자식 순으로 모든 계산을 적용해야 한다!★★★
 				{
-					MD5Joint	ParentJoint = ModelAnimation.FrameSekelton[FrameCount-1].Skeleton[TempFrameJoint.ParentID];
+					MD5Joint	ParentJoint = ModelAnimation[AnimationID].FrameSekelton[FrameCount-1].Skeleton[TempFrameJoint.ParentID];
 
 					XMVECTOR	Q1, POS, Q2;
 					XMFLOAT3	RotatedPos;
@@ -790,7 +838,7 @@ bool ModelMD5::OpenAnimationFromFile(char* FileName)
 					XMStoreFloat4(&TempFrameJoint.Orientation, TempJointOrient);
 				}
 
-				ModelAnimation.FrameSekelton[FrameCount-1].Skeleton[i] = TempFrameJoint;
+				ModelAnimation[AnimationID].FrameSekelton[FrameCount-1].Skeleton[i] = TempFrameJoint;
 			}
 
 			memset(CurKey, 0, sizeof(CurKey));	// 중괄호 닫기
@@ -799,37 +847,42 @@ bool ModelMD5::OpenAnimationFromFile(char* FileName)
 	}
 
 	// 변수 초기화
-	FrameTime = 1.0f / ModelAnimation.FrameRate;			// 각 프레임(Frame) 당 시간 설정 ★
-	TotalAnimTime = ModelAnimation.numFrames * FrameTime;	// 애니메이션 전체 길이
-	CurAnimTime = 0.0f;										// 현재 모델의 애니메이션 시간을 0으로 초기화
+	ModelAnimation[AnimationID].FrameTime = 1.0f / ModelAnimation[AnimationID].FrameRate;			// 각 프레임(Frame) 당 시간 설정 ★
+	ModelAnimation[AnimationID].TotalAnimTime =
+		ModelAnimation[AnimationID].numFrames * ModelAnimation[AnimationID].FrameTime;				// 애니메이션 전체 길이
 
 	return true;
 }
 
-void ModelMD5::Animate(float Speed)
+
+void ModelMD5::InstanceAnimate(int InstanceID, float Speed)
 {
-	CurAnimTime += Speed;							// 애니메이션 진행! (숫자로 애니메이션 속도 조절 가능)
+	if (Speed == 0.0f)
+		Speed = ModelAnimation[ModelInstances[InstanceID].CurAnimID].BasicAnimSpeed;	// 속도 지정을 0으로 하면 기본 속도로 재생
 
-	if(CurAnimTime > TotalAnimTime)					// 애니메이션이 끝나면
-		CurAnimTime = 0.0f;							// 다시 처음으로! ★
+	ModelInstances[InstanceID].CurAnimTime += Speed;
 
-	float CurrentFrame = CurAnimTime * ModelAnimation.FrameRate; // 현재 프레임
-	int Frame0 = (int)floorf( CurrentFrame );		// 보간을 위한 현재 프레임 값
-	int Frame1 = Frame0 + 1;						// 보간을 위한 다음 프레임 값
+	if(ModelInstances[InstanceID].CurAnimTime > ModelAnimation[ModelInstances[InstanceID].CurAnimID].TotalAnimTime)	// 애니메이션이 끝나면
+		ModelInstances[InstanceID].CurAnimTime = 0.0f;																// 다시 처음으로! ★
 
-	if(Frame0 == ModelAnimation.numFrames-1)		// Frame0이 마지막 프레임이라면 Frame1은 다시 0번으로 가자!
+	float CurrentFrame =
+		ModelInstances[InstanceID].CurAnimTime * ModelAnimation[ModelInstances[InstanceID].CurAnimID].FrameRate;	// 현재 프레임
+	int Frame0 = (int)floorf( CurrentFrame );															// 보간을 위한 현재 프레임 값
+	int Frame1 = Frame0 + 1;																			// 보간을 위한 다음 프레임 값
+
+	if(Frame0 == ModelAnimation[ModelInstances[InstanceID].CurAnimID].numFrames-1)	// Frame0이 마지막 프레임이라면 Frame1은 다시 0번으로 가자!
 		Frame1 = 0;
 
-	float Interpolation = CurrentFrame - Frame0;	// Frame0과 CurrentFrame의 시간차를 얻어와 보간값으로 사용한다.
+	float Interpolation = CurrentFrame - Frame0;			// Frame0과 CurrentFrame의 시간차를 얻어와 보간값으로 사용한다.
 
 	MD5Joint InterpolatedJoints[MAX_JOINTS];
 
 	// 보간값(Interpolation) 계산
-	for( int i = 0; i < ModelAnimation.numJoints; i++)
+	for( int i = 0; i < ModelAnimation[ModelInstances[InstanceID].CurAnimID].numJoints; i++)
 	{
 		MD5Joint TempJoint;
-		MD5Joint Joint0 = ModelAnimation.FrameSekelton[Frame0].Skeleton[i];	// Frame0의 i번째 JointData
-		MD5Joint Joint1 = ModelAnimation.FrameSekelton[Frame1].Skeleton[i];	// Frame1의 i번째 JointData
+		MD5Joint Joint0 = ModelAnimation[ModelInstances[InstanceID].CurAnimID].FrameSekelton[Frame0].Skeleton[i];	// Frame0의 i번째 JointData
+		MD5Joint Joint1 = ModelAnimation[ModelInstances[InstanceID].CurAnimID].FrameSekelton[Frame1].Skeleton[i];	// Frame1의 i번째 JointData
 
 		TempJoint.Position.x = Joint0.Position.x + (Interpolation * (Joint1.Position.x - Joint0.Position.x));
 		TempJoint.Position.y = Joint0.Position.y + (Interpolation * (Joint1.Position.y - Joint0.Position.y));
@@ -917,7 +970,7 @@ HRESULT ModelMD5::UpdateVertices(LPDIRECT3DDEVICE9 D3DDevice, int MeshIndex)
 		}
 
 		int SizeOfVertices = sizeof(ANYVERTEX)*numMeshVertices[MeshIndex];
-		if (FAILED(D3DDevice->CreateVertexBuffer(SizeOfVertices, 0, D3DFVF_CUSTOMVERTEX, D3DPOOL_DEFAULT, &g_pModelVB, NULL)))
+		if (FAILED(D3DDevice->CreateVertexBuffer(SizeOfVertices, 0, D3DFVF_ANYVERTEX, D3DPOOL_DEFAULT, &g_pModelVB, NULL)))
 			return E_FAIL;
 	
 		VOID* pVertices;
@@ -968,14 +1021,6 @@ HRESULT ModelMD5::SetTexture(LPDIRECT3DDEVICE9 D3DDevice, int MeshIndex)
 	return S_OK;
 }
 
-void ModelMD5::CreateModel(LPDIRECT3DDEVICE9 D3DDevice)
-{
-	for (int i = 0; i < numMeshes; i++)
-	{
-		SetTexture(D3DDevice, i);
-	}
-}
-
 void ModelMD5::DrawModel(LPDIRECT3DDEVICE9 D3DDevice)
 {
 	// 모델의 각 메쉬를 그린다!
@@ -994,7 +1039,7 @@ void ModelMD5::DrawModel(LPDIRECT3DDEVICE9 D3DDevice)
 
 		D3DDevice->SetTexture(0, ModelTextures[i]);
 		D3DDevice->SetStreamSource(0, g_pModelVB, 0, sizeof(ANYVERTEX));
-		D3DDevice->SetFVF(D3DFVF_CUSTOMVERTEX);
+		D3DDevice->SetFVF(D3DFVF_ANYVERTEX);
 		D3DDevice->SetIndices(g_pModelIB);
 
 		D3DDevice->DrawIndexedPrimitive(D3DPT_TRIANGLELIST, 0, 0, numMeshVertices[i], 0, numMeshIndices[i]);
@@ -1012,194 +1057,4 @@ void ModelMD5::Destroy()
 	}
 
 	return;
-}
-
-
-// 문자열 관련 함수 //
-char* StringTrim(char* sBuf)
-{
-	int iLen	= 0;
-	int	i		= 0;
-	int iCnt	= 0;
-
-	iLen = strlen(sBuf);
-
-	if(iLen < 1)
-		return NULL;
-
-	// 우측의 공백 제거
-	for(i = iLen-1; i >= 0 ; --i)
-	{
-		char* p = sBuf + i;
-
-		if( ' ' == *p || '\t' == *p)
-			continue;
-
-		*(sBuf + i+1) = '\0';
-		break;
-	}
-	iLen = i +1 +1;
-
-	// 좌측의 공백제거
-	char sT[MAX_PARSE_LINE] = {0};
-	strncpy_s(sT, sBuf, iLen);
-
-	for(i=0; i < iLen; ++i)
-	{
-		char* p = sT + i;
-
-		if( ' ' == *p || '\t' == *p)
-			continue;
-
-		break;
-	}
-
-	strcpy_s(TempString, sT+i);	// 결과 반영
-	return TempString;
-}
-
-char* SplitString(char* String, char* SplitChar, int SplitIndex)
-{
-	memset(TempString, 0, sizeof(TempString));
-
-	int iLen = strlen(String);
-	int previ = 0;
-	int splitcount = 0;
-	
-	for (int i = 1; i < iLen; i++)
-	{
-		if (String[i] == SplitChar[0])
-		{
-			if (splitcount == SplitIndex)
-			{
-				for (int j = previ+1; j < i; j++)
-				{
-					TempString[j-previ-1] = String[j];
-				}
-				break;
-			}
-
-			splitcount++;
-			previ = i;
-		}
-	}
-
-	return TempString;
-}
-
-char* GetNameBetweenBraces(char* val)
-{
-	memset(TempString, 0, sizeof(TempString));
-
-	int iLen = strlen(val);
-	int firstspace = 0;
-	int secondspace = 0;
-
-	for (int i = 0; i < iLen; i++)
-	{
-		if (val[i] == '{')
-		{
-			firstspace = i+1;
-		}
-		if (val[i] == '}')
-		{
-			secondspace = i-1;
-			break;
-		}
-	}
-
-	for (int i = firstspace; i <= secondspace; i++)
-	{
-		TempString[i-firstspace] = val[i];
-	}
-
-	strcpy_s(TempString, StringTrim(TempString));
-
-	return TempString;
-}
-
-char* GetNameBetweenQuotes(char* val)
-{
-	memset(TempString, 0, sizeof(TempString));
-
-	int iLen = strlen(val);
-	int firstspace = 0;
-	int secondspace = 0;
-
-	for (int i = 0; i < iLen; i++)
-	{
-		if (val[i] == '\"')
-		{
-			if (firstspace == 0)
-			{
-				firstspace = i+1;
-			}
-			else
-			{
-				secondspace = i-1;
-				break;
-			}
-		}
-	}
-
-	for (int i = firstspace; i <= secondspace; i++)
-	{
-		TempString[i-firstspace] = val[i];
-	}
-
-	strcpy_s(TempString, StringTrim(TempString));
-
-	return TempString;
-}
-
-bool FindString(char* val, char* cmp)
-{
-	return (0 == _strnicmp(val, cmp, strlen(cmp)) ) ? 1: 0;
-}
-
-bool FindChar(char* val, char* cmp)
-{
-	int iLen = strlen(val);
-
-	if (iLen < 1)
-		return false;
-
-	for (int i = 0; i <= iLen; i++)
-	{
-		if (val[i] == cmp[0])
-			return true;
-	}
-
-	return false;
-}
-
-void GetFloatFromLine(char* line, char* split, char* splita)
-{
-	memset(ParseFloats, 0, sizeof(ParseFloats));	// float 값을 저장할 변수 초기화
-
-	char temp[MAX_PARSE_LINE] = {0};
-	strcpy_s(temp, line);
-	strcat_s(temp, split);							// 마지막에 나오는 값도 얻어올 수 있도록 split문자 마지막에 하나 추가
-	int iLen = strlen(temp);
-
-	int previ = 0;
-	int iNum = 0;
-
-	for (int i = 0; i < iLen; i++)
-	{
-		char parsetemp[MAX_PARSE_LINE] = {0};
-		if ((temp[i] == split[0]) || (temp[i] == splita[0]))
-		{
-			if (previ >= i)		// split 문자가 연속으로 나옴. 즉, 값이 없음!
-				continue;
-
-			for (int j = previ; j < i; j++)
-			{
-				parsetemp[j-previ] = temp[j];
-			}
-			iNum++;
-			ParseFloats[iNum-1] = (float)atof(parsetemp);
-			previ = i+1;
-		}
-	}
 }

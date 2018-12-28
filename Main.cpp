@@ -51,6 +51,7 @@ HRESULT InitD3D( HWND hWnd )
 	d3dpp.EnableAutoDepthStencil = TRUE;		// 자동 깊이 공판(Depth Stencil)을 사용한다. (그래야 컴퓨터가 알아서 멀리 있는 걸 먼저 그려줌★)
 	d3dpp.AutoDepthStencilFormat = D3DFMT_D16;	// 깊이 공판 형식: D3DFMT_D16
 	d3dpp.BackBufferFormat = D3DFMT_UNKNOWN;	// 후면 버퍼 형식: D3DFMT_UNKNOWN는 현재 바탕화면 포맷과 일치
+	//d3dpp.PresentationInterval = D3DPRESENT_INTERVAL_IMMEDIATE;	// 이게 있으면 60FPS를 넘어서 그려진다
 
 	if( FAILED( g_pD3D->CreateDevice( D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, hWnd, D3DCREATE_HARDWARE_VERTEXPROCESSING, &d3dpp, &g_pd3dDevice ) ) )
 		return E_FAIL;
@@ -66,10 +67,19 @@ HRESULT InitD3D( HWND hWnd )
 
 HRESULT InitModel()
 {
-	MyMD5Model[0].OpenAndCreateAtOnce(g_pd3dDevice, "Model\\", "EzrealWalk");
-	MyMD5Model[1].OpenAndCreateAtOnce(g_pd3dDevice, "Model\\", "EzrealWalk");
-	MyMD5Model[2].OpenAndCreateAtOnce(g_pd3dDevice, "Model\\", "EzrealWalk");
-	MyMD5Model[3].OpenAndCreateAtOnce(g_pd3dDevice, "Model\\", "EzrealWalk");
+	MyMD5Model[0].CreateModel(g_pd3dDevice, "Model\\", "Ezreal");
+	MyMD5Model[0].CreateAnimation(0, "EzrealWalk", 0.02f);
+	MyMD5Model[0].CreateAnimation(1, "EzrealPunching", 0.02f);
+	MyMD5Model[0].CreateAnimation(2, "EzrealStanding1HMagicAttack01", 0.02f);
+
+	MyMD5Model[0].AddInstance( XMFLOAT3(0.0f, -40.f, 0.0f), XMFLOAT3(0.0f, 0.f, 0.0f), XMFLOAT3(0.04f, 0.04f, 0.04f) );
+	MyMD5Model[0].InstanceSetAnimation(0, 0, 0.0f);
+
+	MyMD5Model[0].AddInstance( XMFLOAT3(40.0f, -40.f, 0.0f), XMFLOAT3(0.0f, 0.f, 0.0f), XMFLOAT3(0.04f, 0.04f, 0.04f) );
+	MyMD5Model[0].InstanceSetAnimation(1, 1, 0.0f);
+
+	MyMD5Model[0].AddInstance( XMFLOAT3(80.0f, -40.f, 0.0f), XMFLOAT3(0.0f, 0.f, 0.0f), XMFLOAT3(0.04f, 0.04f, 0.04f) );
+	MyMD5Model[0].InstanceSetAnimation(2, 2, 0.0f);
 
 	return S_OK;
 }
@@ -88,7 +98,7 @@ VOID SetupCameraMatrices()
 	g_pd3dDevice->SetTransform( D3DTS_PROJECTION, &matProj );
 }
 
-VOID SetupModelMatrix(float Tx, float Ty, float Tz, float Rx, float Ry, float Rz, float Sx, float Sy, float Sz)
+VOID SetupModelMatrix(XMFLOAT3 Translation, XMFLOAT3 Rotation, XMFLOAT3 Scaling)
 {
 	// 월드 행렬(위치, 회전, 크기 설정)
 	D3DXMatrixIdentity( &matModelWorld );
@@ -99,11 +109,11 @@ VOID SetupModelMatrix(float Tx, float Ty, float Tz, float Rx, float Ry, float Rz
 		D3DXMATRIXA16 matRotZ;
 		D3DXMATRIXA16 matSize;
 
-		D3DXMatrixTranslation(&matTrans, Tx, Ty, Tz);
-		D3DXMatrixRotationX(&matRotX, Rx);
-		D3DXMatrixRotationY(&matRotY, Ry);				// Y축을 기준으로 회전 (즉, X&Z가 회전함)
-		D3DXMatrixRotationZ(&matRotZ, Rz);
-		D3DXMatrixScaling(&matSize, Sx, Sy, Sz);
+		D3DXMatrixTranslation(&matTrans, Translation.x, Translation.y, Translation.z);
+		D3DXMatrixRotationX(&matRotX, Rotation.x);
+		D3DXMatrixRotationY(&matRotY, Rotation.y);				// Y축을 기준으로 회전 (즉, X&Z가 회전함)
+		D3DXMatrixRotationZ(&matRotZ, Rotation.z);
+		D3DXMatrixScaling(&matSize, Scaling.x, Scaling.y, Scaling.z);
 
 	matModelWorld = matModelWorld * matTrans * matRotX * matRotY * matRotZ * matSize;
 	g_pd3dDevice->SetTransform(D3DTS_WORLD, &matModelWorld);
@@ -142,22 +152,15 @@ VOID Render()
 		SetupCameraMatrices();
 		SetupLights();
 
-		SetupModelMatrix(0.0f, -40.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.04f, 0.04f, 0.04f);
-		MyMD5Model[0].Animate(0.02f);
-		MyMD5Model[0].DrawModel(g_pd3dDevice);
-
-		SetupModelMatrix(40.0f, -40.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.04f, 0.04f, 0.04f);
-		MyMD5Model[1].Animate(0.02f);
-		MyMD5Model[1].DrawModel(g_pd3dDevice);
-
-		SetupModelMatrix(80.0f, -40.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.04f, 0.04f, 0.04f);
-		MyMD5Model[2].Animate(0.02f);
-		MyMD5Model[2].DrawModel(g_pd3dDevice);
-
-		SetupModelMatrix(120.0f, -40.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.04f, 0.04f, 0.04f);
-		MyMD5Model[3].Animate(0.02f);
-		MyMD5Model[3].DrawModel(g_pd3dDevice);
-
+		for (int i = 0; i < MyMD5Model[0].numInstances; i++)
+		{
+			SetupModelMatrix(MyMD5Model[0].ModelInstances[i].Translation,
+				MyMD5Model[0].ModelInstances[i].Rotation,
+				MyMD5Model[0].ModelInstances[i].Scaling);
+			MyMD5Model[0].InstanceAnimate(i, 0.0f);
+			MyMD5Model[0].DrawModel(g_pd3dDevice);
+		}
+		
 		g_pd3dDevice->EndScene();
 	}
 

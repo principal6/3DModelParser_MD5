@@ -192,10 +192,12 @@
   <ItemGroup>
     <ClCompile Include="Main.cpp" />
     <ClCompile Include="ModelMD5.cpp" />
+    <ClCompile Include="Parser.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Global.h" />
     <ClInclude Include="ModelMD5.h" />
+    <ClInclude Include="Parser.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
