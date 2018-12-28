@@ -1,20 +1,17 @@
 #include "Global.h"
 #include "Parser.h"
 
-#define MAX_JOINTS			100			// 모델 - 최대 관절 개수			66
+#define MAX_JOINTS			100			// 모델 - 최대 관절 개수			34
 #define MAX_OBJECTS			5			// 모델 - 최대 물체 개수
 #define MAX_MATERIALS		5			// 모델 - 최대 재질 개수
 #define MAX_MESHES			10			// 모델 - 최대 메쉬 개수
-#define MAX_MESH_VERTICES	8000		// 모델 - 메쉬별 최대 정점 개수		8635
-#define MAX_MESH_INDICES	9000		// 모델 - 메쉬별 최대 색인 개수		14238
-#define MAX_MESH_WEIGHTS	10000		// 모델 - 메쉬별 최대 가중치 개수	18013
 
-#define MAX_VERTICES		30000		// 모델 - 최대 정점 개수
-#define MAX_INDICES			40000		// 모델 - 최대 색인 개수
-#define MAX_WEIGHTS			50000		// 모델 - 최대 가중치 개수
+#define MAX_VERTICES		6000		// 모델 - 최대 정점 개수			2412
+#define MAX_INDICES			8000		// 모델 - 최대 색인 개수			3243
+#define MAX_WEIGHTS			10000		// 모델 - 최대 가중치 개수			4398
 
-#define MAX_ANIMATIONS		10			// 모델 - 애니메이션 최대 개수
-#define MAX_FRAMES			160			// 모델 - 애니메이션 최대 프레임
+#define MAX_ANIMATIONS		20			// 모델 - 애니메이션 최대 개수
+#define MAX_FRAMES			100			// 모델 - 애니메이션 최대 프레임
 
 #define MAX_INSTANCES		1000		// 모델 - 최대 인스턴스 개수
 
@@ -22,9 +19,24 @@
 // 정점 구조체 선언 - 위치(Position), 텍스처 좌표(Texture Coordinates), 법선 벡터(Normal) //
 struct VERTEX_MD5	// 위치 -> 법선 -> 텍스처 순서를 반드시 지켜야 함!★★★
 {
+	// 정점 데이터
 	XMFLOAT3 Position;
 	XMFLOAT3 Normal;
 	XMFLOAT2 Texture;
+
+	// 애니메이션 데이터
+	float		WeightStart;
+	float		WeightNum;
+};
+
+struct INSTANCE_DATA_MD5	// HLSL용 인스턴스 데이터
+{
+	XMFLOAT4	matModelWorld[4];
+	float		bAnimated;
+	float		InstanceAnimtationID;
+	float		CurFrameTime;
+	float		Frame0;
+	float		Frame1;
 };
 
 struct VERTEX_MD5_BB
@@ -55,6 +67,7 @@ struct INDEX_MD5_NORMAL
 {
 	WORD _0, _1;
 };
+
 
 struct Joint_MD5
 {
@@ -142,7 +155,13 @@ struct Instance_MD5
 
 	int			CurAnimID;
 	float		CurAnimTime;
+	float		CurFrameTime;
+	int			Frame0;
+	int			Frame1;
+
 	bool		BeingAnimated;
+
+	Joint_MD5	InterpolatedJoints[MAX_JOINTS];	// 추가!★★
 };
 
 // MD5 모델 클래스
@@ -150,7 +169,7 @@ class ModelMD5 {
 public:
 	ModelMD5();
 	~ModelMD5();
-	
+
 	int				numInstances;
 	Instance_MD5	ModelInstances[MAX_INSTANCES];
 	D3DXMATRIXA16	matModelWorld[MAX_INSTANCES];
@@ -160,34 +179,41 @@ public:
 	XMFLOAT3		PickedPosition[MAX_INSTANCES];
 
 	char			BaseDir[MAX_NAME_LEN];
-	void ModelMD5::SetBaseDirection(char* Dir);
+	void			SetBaseDirection(char* Dir);
 
-	LPDIRECT3DTEXTURE9		ModelTextures[MAX_MATERIALS];
-	HRESULT ModelMD5::CreateModel(LPDIRECT3DDEVICE9 D3DDevice, char* BaseDir, char* FileNameWithoutExtension);
-	bool ModelMD5::OpenMeshFromFile(char* FileName);
-	HRESULT ModelMD5::SetTexture(LPDIRECT3DDEVICE9 D3DDevice, int MeshIndex);
-	void ModelMD5::CreateModelBoundingBox(LPDIRECT3DDEVICE9 D3DDevice);
+	HRESULT			CreateModel(LPDIRECT3DDEVICE9 D3DDevice, char* BaseDir, char* FileNameWithoutExtension);
+	bool			OpenMeshFromFile(char* FileName);
+	HRESULT			SetTexture(LPDIRECT3DDEVICE9 D3DDevice, int MeshIndex);
+	void			CreateModelBoundingBox(LPDIRECT3DDEVICE9 D3DDevice);
+	void			UpdateModelBoundingBox();
 
-	bool ModelMD5::CreateAnimation(int AnimationID, char* AnimationFileName, float AnimationSpeed);
-		bool ModelMD5::OpenAnimationFromFile(int AnimationID, char* FileName);
+	bool	AddAnimation(int AnimationID, char* AnimationFileName, float AnimationSpeed);
+	bool	OpenAnimationFromFile(int AnimationID, char* FileName);
 
-	bool ModelMD5::InstanceSetAnimation(int InstanceID, int AnimationID, float StartAnimTime);
-	void ModelMD5::InstanceAnimate(int InstanceID, float Speed);
-	void ModelMD5::AddInstance(XMFLOAT3 Translation, XMFLOAT3 Rotation, XMFLOAT3 Scaling);
-	void ModelMD5::SetInstance(int InstanceID, XMFLOAT3 Translation, XMFLOAT3 Rotation, XMFLOAT3 Scaling);
+	void	AddInstance(XMFLOAT3 Translation, XMFLOAT3 Rotation, XMFLOAT3 Scaling);
+	bool	SetInstanceAnimation(int InstanceID, int AnimationID, float StartAnimTime);
+	void	SetInstance(int InstanceID, XMFLOAT3 Translation, XMFLOAT3 Rotation, XMFLOAT3 Scaling);
+	void	InstanceAnimate(int InstanceID, float Speed);
 
-	void ModelMD5::CreateInstanceVB(LPDIRECT3DDEVICE9 D3DDevice);
-	void ModelMD5::UpdateInstanceVB(LPDIRECT3DDEVICE9 D3DDevice);
+	void	CreateInstanceBuffer(LPDIRECT3DDEVICE9 D3DDevice);
+	void	UpdateInstanceBuffer(LPDIRECT3DDEVICE9 D3DDevice);
 
-	void ModelMD5::DrawModel(LPDIRECT3DDEVICE9 D3DDevice);
-	void ModelMD5::DrawModel_HLSL(LPDIRECT3DDEVICE9 D3DDevice, LPD3DXEFFECT HLSL);
-	void ModelMD5::DrawBoundingBoxes(LPDIRECT3DDEVICE9 D3DDevice);
-	HRESULT ModelMD5::DrawNormalVecters(LPDIRECT3DDEVICE9 D3DDevice, float LenFactor);
-	PickingRay ModelMD5::GetPickingRay(LPDIRECT3DDEVICE9 D3DDevice, int MouseX, int MouseY,
+	HRESULT	CreateAnimationJointTexture(LPDIRECT3DDEVICE9 D3DDevice, LPD3DXEFFECT HLSL);
+	HRESULT	CreateAnimationWeightTexture(LPDIRECT3DDEVICE9 D3DDevice, LPD3DXEFFECT HLSL);
+
+	void	DrawModel(LPDIRECT3DDEVICE9 D3DDevice);
+	void	DrawModel_HLSL(LPDIRECT3DDEVICE9 D3DDevice, LPD3DXEFFECT HLSL);
+
+	void	DrawBoundingBoxes(LPDIRECT3DDEVICE9 D3DDevice);
+	void	DrawBoundingBoxes_HLSL(LPDIRECT3DDEVICE9 D3DDevice, LPD3DXEFFECT HLSL);
+
+	HRESULT	DrawNormalVecters(LPDIRECT3DDEVICE9 D3DDevice, float LenFactor);
+
+	PickingRay	GetPickingRay(LPDIRECT3DDEVICE9 D3DDevice, int MouseX, int MouseY,
 		int ScreenWidth, int ScreenHeight, D3DXMATRIX matView, D3DXMATRIX matProj);
-	bool ModelMD5::CheckMouseOverPerInstance(LPDIRECT3DDEVICE9 D3DDevice, int InstanceID, int MouseX, int MouseY,
+	bool		CheckMouseOverPerInstance(LPDIRECT3DDEVICE9 D3DDevice, int InstanceID, int MouseX, int MouseY,
 		int ScreenWidth, int ScreenHeight, D3DXMATRIX matView, D3DXMATRIX matProj);
-	void ModelMD5::CheckMouseOverFinal();
+	void		CheckMouseOverFinal();
 
 private:
 	Joint_MD5		ModelJoints[MAX_JOINTS];
@@ -219,6 +245,10 @@ private:
 
 	BoundingBox_MD5	TBB;
 	BoundingBox_MD5	TBB_Animed;
+
+	LPDIRECT3DTEXTURE9				ModelTextures[MAX_MATERIALS];
+	LPDIRECT3DTEXTURE9				AnimationJointTexture;
+	LPDIRECT3DTEXTURE9				AnimationWeightTexture;
 
 	LPDIRECT3DVERTEXDECLARATION9	g_pVBDeclaration;
 };

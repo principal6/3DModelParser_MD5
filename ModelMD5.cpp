@@ -38,26 +38,27 @@ KEYWORD	KeyWords_MD5[] =
 char		TabChar[] = {'\t'};
 
 
-struct INSTANCE_DATA_MD5
-{
-	XMFLOAT4	matModelWorld0;
-	XMFLOAT4	matModelWorld1;
-	XMFLOAT4	matModelWorld2;
-	XMFLOAT4	matModelWorld3;
-	float		bAnimated;
-};
-
 D3DVERTEXELEMENT9 g_VBElements[] =
 {
-    { 0, 0,			D3DDECLTYPE_FLOAT3,	D3DDECLMETHOD_DEFAULT,	D3DDECLUSAGE_POSITION,	0 },
-    { 0, 4 * 3,		D3DDECLTYPE_FLOAT3,	D3DDECLMETHOD_DEFAULT,	D3DDECLUSAGE_NORMAL,	0 },
-    { 0, 4 * 6,		D3DDECLTYPE_FLOAT2,	D3DDECLMETHOD_DEFAULT,	D3DDECLUSAGE_TEXCOORD,	0 },
-    { 1, 0,			D3DDECLTYPE_FLOAT4,	D3DDECLMETHOD_DEFAULT,	D3DDECLUSAGE_POSITION,	1 },
-	{ 1, 4 * 4,		D3DDECLTYPE_FLOAT4,	D3DDECLMETHOD_DEFAULT,	D3DDECLUSAGE_POSITION,	2 },
-	{ 1, 4 * 8,		D3DDECLTYPE_FLOAT4,	D3DDECLMETHOD_DEFAULT,	D3DDECLUSAGE_POSITION,	3 },
-	{ 1, 4 * 12,	D3DDECLTYPE_FLOAT4,	D3DDECLMETHOD_DEFAULT,	D3DDECLUSAGE_POSITION,	4 },
-	{ 1, 4 * 16,	D3DDECLTYPE_FLOAT1,	D3DDECLMETHOD_DEFAULT,	D3DDECLUSAGE_PSIZE,		0 },
-    D3DDECL_END()
+	// 정점 정보
+	{ 0, 4 * 0,		D3DDECLTYPE_FLOAT3,	D3DDECLMETHOD_DEFAULT,	D3DDECLUSAGE_POSITION,		0 },
+	{ 0, 4 * 3,		D3DDECLTYPE_FLOAT3,	D3DDECLMETHOD_DEFAULT,	D3DDECLUSAGE_NORMAL,		0 },
+	{ 0, 4 * 6,		D3DDECLTYPE_FLOAT2,	D3DDECLMETHOD_DEFAULT,	D3DDECLUSAGE_TEXCOORD,		0 },
+    { 0, 4 * 8,		D3DDECLTYPE_FLOAT1,	D3DDECLMETHOD_DEFAULT,	D3DDECLUSAGE_PSIZE,			0 },
+	{ 0, 4 * 9,		D3DDECLTYPE_FLOAT1,	D3DDECLMETHOD_DEFAULT,	D3DDECLUSAGE_PSIZE,			1 },
+
+	// 인스턴스 정보
+	{ 1, 4 * 0,		D3DDECLTYPE_FLOAT4,	D3DDECLMETHOD_DEFAULT,	D3DDECLUSAGE_POSITION,		1 },	// XMFLOAT4	matModelWorld[4];
+	{ 1, 4 * 4,		D3DDECLTYPE_FLOAT4,	D3DDECLMETHOD_DEFAULT,	D3DDECLUSAGE_POSITION,		2 },
+	{ 1, 4 * 8,		D3DDECLTYPE_FLOAT4,	D3DDECLMETHOD_DEFAULT,	D3DDECLUSAGE_POSITION,		3 },
+	{ 1, 4 * 12,	D3DDECLTYPE_FLOAT4,	D3DDECLMETHOD_DEFAULT,	D3DDECLUSAGE_POSITION,		4 },
+	{ 1, 4 * 16,	D3DDECLTYPE_FLOAT1,	D3DDECLMETHOD_DEFAULT,	D3DDECLUSAGE_PSIZE,			2 },	// float		bAnimated;
+	{ 1, 4 * 17,	D3DDECLTYPE_FLOAT1,	D3DDECLMETHOD_DEFAULT,	D3DDECLUSAGE_PSIZE,			3 },	// float		InstanceAnimtationID;
+	{ 1, 4 * 18,	D3DDECLTYPE_FLOAT1,	D3DDECLMETHOD_DEFAULT,	D3DDECLUSAGE_PSIZE,			4 },	// float		CurFrameTime;
+	{ 1, 4 * 19,	D3DDECLTYPE_FLOAT1,	D3DDECLMETHOD_DEFAULT,	D3DDECLUSAGE_PSIZE,			5 },	// float		Frame0;
+	{ 1, 4 * 20,	D3DDECLTYPE_FLOAT1,	D3DDECLMETHOD_DEFAULT,	D3DDECLUSAGE_PSIZE,			6 },	// float		Frame1;
+
+	D3DDECL_END()
 };
 
 ModelMD5::ModelMD5()
@@ -102,12 +103,15 @@ ModelMD5::ModelMD5()
 
 ModelMD5::~ModelMD5()
 {
-	for (int i = 0; i < numMeshes; i++)
+	for (int i = 0; i < MAX_MATERIALS; i++)
 	{
 		SAFE_RELEASE(ModelTextures[i]);
 	}
-
+	SAFE_RELEASE(AnimationJointTexture);
+	SAFE_RELEASE(AnimationWeightTexture);
+	
 	SAFE_RELEASE(g_pVBDeclaration);
+
 }
 
 HRESULT ModelMD5::CreateModel(LPDIRECT3DDEVICE9 D3DDevice, char* BaseDir, char* FileNameWithoutExtension)
@@ -208,7 +212,37 @@ void ModelMD5::CreateModelBoundingBox(LPDIRECT3DDEVICE9 D3DDevice)
 	return;
 }
 
-bool ModelMD5::CreateAnimation(int AnimationID, char* AnimationFileName, float AnimationSpeed)
+void ModelMD5::UpdateModelBoundingBox()
+{
+	XMFLOAT3 Min = XMFLOAT3(0.0f, 0.0f, 0.0f);
+	XMFLOAT3 Max = XMFLOAT3(0.0f, 0.0f, 0.0f);
+
+	Min = TVertices[0].Position;
+	Max = TVertices[0].Position;
+
+	for (int j = 0; j < numTVertices; j++)
+	{
+		if ( Min.x > TVertices[j].Position.x)
+			Min.x = TVertices[j].Position.x;
+		if ( Min.y > TVertices[j].Position.y)
+			Min.y = TVertices[j].Position.y;
+		if ( Min.z > TVertices[j].Position.z)
+			Min.z = TVertices[j].Position.z;
+
+		if ( Max.x < TVertices[j].Position.x)
+			Max.x = TVertices[j].Position.x;
+		if ( Max.y < TVertices[j].Position.y)
+			Max.y = TVertices[j].Position.y;
+		if ( Max.z < TVertices[j].Position.z)
+			Max.z = TVertices[j].Position.z;
+	}
+
+	TBB.Min = Min;
+	TBB.Max = Max;
+	return;
+}
+
+bool ModelMD5::AddAnimation(int AnimationID, char* AnimationFileName, float AnimationSpeed)
 {
 	// 모델 애니메이션 불러오기
 	char	NewFileName[MAX_NAME_LEN] = {0};
@@ -228,7 +262,18 @@ bool ModelMD5::CreateAnimation(int AnimationID, char* AnimationFileName, float A
 	return true;
 }
 
-bool ModelMD5::InstanceSetAnimation(int InstanceID, int AnimationID, float StartAnimTime)
+void ModelMD5::AddInstance(XMFLOAT3 Translation, XMFLOAT3 Rotation, XMFLOAT3 Scaling)
+{
+	numInstances++;
+
+	memset(&ModelInstances[numInstances-1], 0, sizeof(ModelInstances[numInstances-1]));
+
+	SetInstance(numInstances-1, Translation, Rotation, Scaling);
+
+	return;
+}
+
+bool ModelMD5::SetInstanceAnimation(int InstanceID, int AnimationID, float StartAnimTime)
 {
 	if (AnimationID > TotalAnimCount)
 		AnimationID = 0;
@@ -244,17 +289,6 @@ bool ModelMD5::InstanceSetAnimation(int InstanceID, int AnimationID, float Start
 	ModelInstances[InstanceID].CurAnimTime = StartAnimTime;
 
 	return true;
-}
-
-void ModelMD5::AddInstance(XMFLOAT3 Translation, XMFLOAT3 Rotation, XMFLOAT3 Scaling)
-{
-	numInstances++;
-
-	memset(&ModelInstances[numInstances-1], 0, sizeof(ModelInstances[numInstances-1]));
-
-	SetInstance(numInstances-1, Translation, Rotation, Scaling);
-
-	return;
 }
 
 void ModelMD5::SetInstance(int InstanceID, XMFLOAT3 Translation, XMFLOAT3 Rotation, XMFLOAT3 Scaling)
@@ -283,7 +317,7 @@ void ModelMD5::SetInstance(int InstanceID, XMFLOAT3 Translation, XMFLOAT3 Rotati
 	return;
 }
 
-void ModelMD5::CreateInstanceVB(LPDIRECT3DDEVICE9 D3DDevice)
+void ModelMD5::CreateInstanceBuffer(LPDIRECT3DDEVICE9 D3DDevice)
 {
 	SAFE_RELEASE(g_pVBDeclaration);
 	SAFE_RELEASE(g_pModelInstanceVB);
@@ -293,7 +327,7 @@ void ModelMD5::CreateInstanceVB(LPDIRECT3DDEVICE9 D3DDevice)
 		0, D3DPOOL_MANAGED, &g_pModelInstanceVB, 0 );
 }
 
-void ModelMD5::UpdateInstanceVB(LPDIRECT3DDEVICE9 D3DDevice)
+void ModelMD5::UpdateInstanceBuffer(LPDIRECT3DDEVICE9 D3DDevice)
 {
 	INSTANCE_DATA_MD5* pIDATA;
 	HRESULT hr = g_pModelInstanceVB->Lock( 0, NULL, ( void** )&pIDATA, 0 );
@@ -305,34 +339,42 @@ void ModelMD5::UpdateInstanceVB(LPDIRECT3DDEVICE9 D3DDevice)
 			INSTANCE_DATA_MD5 InstanceModel;
 			memset(&InstanceModel, 0, sizeof(InstanceModel));
 
-			// 인스턴스 정보 대입 (인스턴스의 월드 행렬)
-			InstanceModel.matModelWorld0.x = matModelWorld[i]._11;
-			InstanceModel.matModelWorld0.y = matModelWorld[i]._12;
-			InstanceModel.matModelWorld0.z = matModelWorld[i]._13;
-			InstanceModel.matModelWorld0.w = matModelWorld[i]._14;
+			// 인스턴스 정보 대입
+			InstanceModel.matModelWorld[0].x = matModelWorld[i]._11;
+			InstanceModel.matModelWorld[0].y = matModelWorld[i]._12;
+			InstanceModel.matModelWorld[0].z = matModelWorld[i]._13;
+			InstanceModel.matModelWorld[0].w = matModelWorld[i]._14;
 
-			InstanceModel.matModelWorld1.x = matModelWorld[i]._21;
-			InstanceModel.matModelWorld1.y = matModelWorld[i]._22;
-			InstanceModel.matModelWorld1.z = matModelWorld[i]._23;
-			InstanceModel.matModelWorld1.w = matModelWorld[i]._24;
+			InstanceModel.matModelWorld[1].x = matModelWorld[i]._21;
+			InstanceModel.matModelWorld[1].y = matModelWorld[i]._22;
+			InstanceModel.matModelWorld[1].z = matModelWorld[i]._23;
+			InstanceModel.matModelWorld[1].w = matModelWorld[i]._24;
 
-			InstanceModel.matModelWorld2.x = matModelWorld[i]._31;
-			InstanceModel.matModelWorld2.y = matModelWorld[i]._32;
-			InstanceModel.matModelWorld2.z = matModelWorld[i]._33;
-			InstanceModel.matModelWorld2.w = matModelWorld[i]._34;
+			InstanceModel.matModelWorld[2].x = matModelWorld[i]._31;
+			InstanceModel.matModelWorld[2].y = matModelWorld[i]._32;
+			InstanceModel.matModelWorld[2].z = matModelWorld[i]._33;
+			InstanceModel.matModelWorld[2].w = matModelWorld[i]._34;
 
-			InstanceModel.matModelWorld3.x = matModelWorld[i]._41;
-			InstanceModel.matModelWorld3.y = matModelWorld[i]._42;
-			InstanceModel.matModelWorld3.z = matModelWorld[i]._43;
-			InstanceModel.matModelWorld3.w = matModelWorld[i]._44;
+			InstanceModel.matModelWorld[3].x = matModelWorld[i]._41;
+			InstanceModel.matModelWorld[3].y = matModelWorld[i]._42;
+			InstanceModel.matModelWorld[3].z = matModelWorld[i]._43;
+			InstanceModel.matModelWorld[3].w = matModelWorld[i]._44;
 
 			switch (ModelInstances[i].BeingAnimated)
 			{
 			case true:
 				InstanceModel.bAnimated = 1; // 0이면 정지, 1이면 애니메이션 ★
+				InstanceModel.InstanceAnimtationID = (float)ModelInstances[i].CurAnimID;
+				InstanceModel.CurFrameTime = (float)ModelInstances[i].CurFrameTime;
+				InstanceModel.Frame0 = (float)ModelInstances[i].Frame0;
+				InstanceModel.Frame1 = (float)ModelInstances[i].Frame1;
 				break;
 			case false:
 				InstanceModel.bAnimated = 0; // 0이면 정지, 1이면 애니메이션 ★
+				InstanceModel.InstanceAnimtationID = 0;
+				InstanceModel.CurFrameTime = 0;
+				InstanceModel.Frame0 = 0;
+				InstanceModel.Frame1 = 0;
 				break;
 			}
 
@@ -341,6 +383,92 @@ void ModelMD5::UpdateInstanceVB(LPDIRECT3DDEVICE9 D3DDevice)
 
 		g_pModelInstanceVB->Unlock();
 	}
+}
+
+HRESULT ModelMD5::CreateAnimationJointTexture(LPDIRECT3DDEVICE9 D3DDevice, LPD3DXEFFECT HLSL)
+{
+	// ★ Width: 800 = (4 = float4 JointPosition + 4 = float4 JointOrientation) * (100 = MAX_JOINTS)
+	// ★ D3DFMT_R32F: 1 Texel = 1 float & D3DFMT_A32B32G32R32F: 1 Texel = 4 float
+	if (FAILED(D3DDevice->CreateTexture(800, MAX_FRAMES * MAX_ANIMATIONS, 1, 0, D3DFMT_R32F, D3DPOOL_MANAGED, &AnimationJointTexture, 0)))
+		return E_FAIL;
+
+	D3DLOCKED_RECT	LockedRect = {0,};
+	AnimationJointTexture->LockRect(0, &LockedRect, NULL, 0);
+
+	// 텍스처에 애니메이션 정보 담기
+	int		tempCount = 0;
+	float*	tempFloats = new float[800 * MAX_FRAMES * MAX_ANIMATIONS];	// 800 = 8(Position xyzw + Orientation xyzw) * 100(numJoints) => * MAX_INSTANCES
+	int		tempSize = sizeof(float) * 800 * MAX_FRAMES * MAX_ANIMATIONS;	// 4(size of float) * 800(size of array) * MAX_INSTANCES
+	memset(tempFloats, 0, tempSize);
+
+	for (int k = 0; k < MAX_ANIMATIONS; k++)
+	{
+		for (int i = 0; i < MAX_FRAMES; i++)
+		{
+			for (int j = 0; j < MAX_JOINTS; j++)
+			{
+				tempFloats[0 + tempCount] = ModelAnimation[k].FrameSekelton[i].Skeleton[j].Position.x;
+				tempFloats[1 + tempCount] = ModelAnimation[k].FrameSekelton[i].Skeleton[j].Position.y;
+				tempFloats[2 + tempCount] = ModelAnimation[k].FrameSekelton[i].Skeleton[j].Position.z;
+				tempFloats[3 + tempCount] = 1;
+				tempFloats[4 + tempCount] = ModelAnimation[k].FrameSekelton[i].Skeleton[j].Orientation.x;
+				tempFloats[5 + tempCount] = ModelAnimation[k].FrameSekelton[i].Skeleton[j].Orientation.y;
+				tempFloats[6 + tempCount] = ModelAnimation[k].FrameSekelton[i].Skeleton[j].Orientation.z;
+				tempFloats[7 + tempCount] = ModelAnimation[k].FrameSekelton[i].Skeleton[j].Orientation.w;
+			
+				tempCount += 8;
+			}
+		}
+	}
+
+	memcpy(LockedRect.pBits, tempFloats, tempSize);
+	AnimationJointTexture->UnlockRect(0);
+
+	delete [] tempFloats;
+	tempFloats = NULL;
+
+	HLSL->SetTexture("AnimationJoint_Tex", AnimationJointTexture);
+
+	return S_OK;
+}
+
+HRESULT ModelMD5::CreateAnimationWeightTexture(LPDIRECT3DDEVICE9 D3DDevice, LPD3DXEFFECT HLSL)
+{
+	if (FAILED(D3DDevice->CreateTexture(8 * 100, MAX_WEIGHTS / 100, 1, 0, D3DFMT_R32F, D3DPOOL_MANAGED, &AnimationWeightTexture, 0)))
+		return E_FAIL;
+
+	D3DLOCKED_RECT	LockedRect = {0,};
+	AnimationWeightTexture->LockRect(0, &LockedRect, NULL, 0);
+
+	// 텍스처에 애니메이션 정보 담기
+	int		tempCount = 0;
+	float*	tempFloats = new float[8 * MAX_WEIGHTS];
+	int		tempSize = sizeof(float) * 8 * MAX_WEIGHTS;
+	memset(tempFloats, 0, tempSize);
+
+	for (int i = 0; i < MAX_WEIGHTS; i++)
+	{
+			tempFloats[0 + tempCount] = (float)TWeights[i].JointID;
+			tempFloats[1 + tempCount] = TWeights[i].Bias;
+			tempFloats[2 + tempCount] = TWeights[i].Position.x;
+			tempFloats[3 + tempCount] = TWeights[i].Position.y;
+			tempFloats[4 + tempCount] = TWeights[i].Position.z;
+			tempFloats[5 + tempCount] = TWeights[i].Normal.x;
+			tempFloats[6 + tempCount] = TWeights[i].Normal.y;
+			tempFloats[7 + tempCount] = TWeights[i].Normal.z;
+			
+			tempCount += 8;
+	}
+
+	memcpy(LockedRect.pBits, tempFloats, tempSize);
+	AnimationWeightTexture->UnlockRect(0);
+
+	delete [] tempFloats;
+	tempFloats = NULL;
+
+	HLSL->SetTexture("AnimationWeight_Tex", AnimationWeightTexture);
+
+	return S_OK;
 }
 
 void ModelMD5::SetBaseDirection(char* Dir)
@@ -663,6 +791,12 @@ bool ModelMD5::OpenMeshFromFile(char* FileName)
 
 
 	// 정점 정보 업데이트
+	for (int i = 0; i < numTVertices; i++)
+	{
+		TVertices[i].WeightStart = (float)TVertexWeightStart[i];
+		TVertices[i].WeightNum = (float)TVertexNumWeights[i];
+	}
+
 	for (int j = 0; j < numTVertices; j++)
 	{
 		int WeightStart	= TVertexWeightStart[j];
@@ -704,7 +838,7 @@ bool ModelMD5::OpenMeshFromFile(char* FileName)
 	}
 
 
-	XMFLOAT3 tempNormal[MAX_VERTICES];
+	XMFLOAT3* tempNormal = new XMFLOAT3[MAX_VERTICES];
 	XMFLOAT3 unnormalized = XMFLOAT3(0.0f, 0.0f, 0.0f);
 
 	float vecX, vecY, vecZ;
@@ -780,6 +914,8 @@ bool ModelMD5::OpenMeshFromFile(char* FileName)
 		facesUsing = 0;
 	}
 
+	delete[] tempNormal;
+	tempNormal = NULL;
 
 	fclose(fp);
 
@@ -1100,7 +1236,11 @@ void ModelMD5::InstanceAnimate(int InstanceID, float Speed)
 	if (Frame0 == ModelAnimation[CurrentAnimID].numFrames-1)	// Frame0이 마지막 프레임이라면 Frame1은 다시 0번으로 가자!
 		Frame1 = 0;
 
+	ModelInstances[InstanceID].CurFrameTime = CurrentFrame;
+	ModelInstances[InstanceID].Frame0 = Frame0;
+	ModelInstances[InstanceID].Frame1 = Frame1;
 
+	/*
 	// 보간값(Interpolation) 계산
 	float Interpolation = CurrentFrame - Frame0;				// Frame0과 CurrentFrame의 시간차를 얻어와 보간값으로 사용한다.
 	Joint_MD5 InterpolatedJoints[MAX_JOINTS];
@@ -1122,77 +1262,7 @@ void ModelMD5::InstanceAnimate(int InstanceID, float Speed)
 
 		InterpolatedJoints[i] = TempJoint;		// 결과 값을 저장한다!
 	}
-
-
-	// 정점 정보 갱신
-	for (int j = 0; j < numTVertices; j++)
-	{
-		VERTEX_MD5	TempVert = TVertices[j];
-		memset(&TempVert.Position, 0, sizeof(TempVert.Position));	// Position 값을 0으로 초기화!
-		memset(&TempVert.Normal, 0, sizeof(TempVert.Normal));		// Normal 값을 0으로 초기화!
-
-		int WeightStart	= TVertexWeightStart[j];
-		int nWeights	= TVertexNumWeights[j];
-
-		float ResultX = 0.0f;
-		float ResultY = 0.0f;
-		float ResultZ = 0.0f;
-
-		for (int k = 0; k < nWeights; k++)
-		{
-			Weight_MD5	TempWeight	= TWeights[WeightStart+k];
-			//Joint_MD5	TempJoint	= InterpolatedJoints[TempWeight.JointID];	// 보간 적용 ★
-			Joint_MD5	TempJoint	= ModelAnimation[CurrentAnimID].FrameSekelton[Frame0].Skeleton[TempWeight.JointID];	// 보간 미적용 ★
-
-			XMVECTOR	Q1, POS, Q2;
-			XMFLOAT4	Rotated;
-
-			Q1	= XMVectorSet(TempJoint.Orientation.x, TempJoint.Orientation.y, TempJoint.Orientation.z, TempJoint.Orientation.w);
-			POS	= XMVectorSet(TempWeight.Position.x, TempWeight.Position.y, TempWeight.Position.z, 0.0f);
-			Q2	= XMVectorSet(-TempJoint.Orientation.x, -TempJoint.Orientation.y, -TempJoint.Orientation.z, TempJoint.Orientation.w);
-			XMStoreFloat4( &Rotated, XMQuaternionMultiply( XMQuaternionMultiply( Q1, POS ), Q2 ) );
-
-			TempVert.Position.x += ( TempJoint.Position.x + Rotated.x ) * TempWeight.Bias;
-			TempVert.Position.y += ( TempJoint.Position.y + Rotated.y ) * TempWeight.Bias;
-			TempVert.Position.z += ( TempJoint.Position.z + Rotated.z ) * TempWeight.Bias;
-
-			XMVECTOR TempWeightNormal = XMVectorSet(TempWeight.Normal.x, TempWeight.Normal.y, TempWeight.Normal.z, 0.0f);
-			XMStoreFloat4( &Rotated, XMQuaternionMultiply(XMQuaternionMultiply( Q1, TempWeightNormal), Q2 ) );
-
-			TempVert.Normal.x -= Rotated.x * TempWeight.Bias;
-			TempVert.Normal.y -= Rotated.y * TempWeight.Bias;
-			TempVert.Normal.z -= Rotated.z * TempWeight.Bias;
-		}
-
-		TVertices[j].Position = TempVert.Position;
-		TVertices[j].Normal = TempVert.Normal;		// Store the vertices normal
-		XMStoreFloat3(&TVertices[j].Normal, XMVector3Normalize(XMLoadFloat3(&TVertices[j].Normal)));
-	}
-
-
-	// 바운딩 박스 갱신
-	BoundingBox_MD5	TempBB;
-	TempBB.Min = TBB.Max;
-	TempBB.Max = TBB.Min;
-
-	for (int j = 0; j < numTVertices; j++)
-	{
-		if ( TempBB.Min.x > TVertices[j].Position.x)
-			TempBB.Min.x = TVertices[j].Position.x;
-		if ( TempBB.Min.y > TVertices[j].Position.y)
-			TempBB.Min.y = TVertices[j].Position.y;
-		if ( TempBB.Min.z > TVertices[j].Position.z)
-			TempBB.Min.z = TVertices[j].Position.z;
-
-		if ( TempBB.Max.x < TVertices[j].Position.x)
-			TempBB.Max.x = TVertices[j].Position.x;
-		if ( TempBB.Max.y < TVertices[j].Position.y)
-			TempBB.Max.y = TVertices[j].Position.y;
-		if ( TempBB.Max.z < TVertices[j].Position.z)
-			TempBB.Max.z = TVertices[j].Position.z;
-	}
-
-	TBB_Animed = TempBB;
+	*/
 
 	return;
 }
@@ -1403,6 +1473,117 @@ void ModelMD5::DrawBoundingBoxes(LPDIRECT3DDEVICE9 D3DDevice)
 	return;
 }
 
+void ModelMD5::DrawBoundingBoxes_HLSL(LPDIRECT3DDEVICE9 D3DDevice, LPD3DXEFFECT HLSL)
+{
+	XMFLOAT3	BaseBoundingBoxMax;
+	XMFLOAT3	BaseBoundingBoxMin;
+
+	BaseBoundingBoxMax = TBB.Max;
+	BaseBoundingBoxMin = TBB.Min;
+	
+	int numVertices = 8;	// 상자니까 점 8개 필요
+	VERTEX_MD5 *NewVertices = new VERTEX_MD5[numVertices];
+	int SizeOfVertices = sizeof(VERTEX_MD5) * numVertices;
+
+	memset(NewVertices, 0, SizeOfVertices);
+	
+
+		float XLen = BaseBoundingBoxMax.x - BaseBoundingBoxMin.x;
+		float YLen = BaseBoundingBoxMax.y - BaseBoundingBoxMin.y;
+		float ZLen = BaseBoundingBoxMax.z - BaseBoundingBoxMin.z;
+
+		NewVertices[0].Position = BaseBoundingBoxMin;
+		NewVertices[1].Position = BaseBoundingBoxMin;
+			NewVertices[1].Position.x += XLen;
+		NewVertices[2].Position = BaseBoundingBoxMin;
+			NewVertices[2].Position.x += XLen;
+			NewVertices[2].Position.z += ZLen;
+		NewVertices[3].Position = BaseBoundingBoxMin;
+			NewVertices[3].Position.z += ZLen;
+		NewVertices[4].Position = BaseBoundingBoxMin;
+			NewVertices[4].Position.y += YLen;
+		NewVertices[5].Position = BaseBoundingBoxMin;
+			NewVertices[5].Position.y += YLen;
+			NewVertices[5].Position.x += XLen;
+		NewVertices[6].Position = BaseBoundingBoxMin;
+			NewVertices[6].Position.y += YLen;
+			NewVertices[6].Position.x += XLen;
+			NewVertices[6].Position.z += ZLen;
+		NewVertices[7].Position = BaseBoundingBoxMin;
+			NewVertices[7].Position.y += YLen;
+			NewVertices[7].Position.z += ZLen;
+
+		VOID* pVertices;
+		if (FAILED(g_pModelVB->Lock(0, SizeOfVertices, (void**)&pVertices, D3DLOCK_NOSYSLOCK | D3DLOCK_DISCARD)))
+			return;
+		memcpy(pVertices, NewVertices, SizeOfVertices);
+		g_pModelVB->Unlock();
+
+	delete[] NewVertices;
+	NewVertices = NULL;
+		
+
+	int numIndices = 12;	// 상자니까 모서리 12개 필요
+	INDEX_MD5_BB *NewIndices = new INDEX_MD5_BB[numIndices];
+
+		NewIndices[0]._0 = 0, NewIndices[0]._1 = 1;	// 바닥
+		NewIndices[1]._0 = 1, NewIndices[1]._1 = 2;
+		NewIndices[2]._0 = 2, NewIndices[2]._1 = 3;
+		NewIndices[3]._0 = 3, NewIndices[3]._1 = 0;
+		NewIndices[4]._0 = 0, NewIndices[4]._1 = 4;	// 기둥
+		NewIndices[5]._0 = 1, NewIndices[5]._1 = 5;
+		NewIndices[6]._0 = 2, NewIndices[6]._1 = 6;
+		NewIndices[7]._0 = 3, NewIndices[7]._1 = 7;
+		NewIndices[8]._0 = 4, NewIndices[8]._1 = 5;	// 천장
+		NewIndices[9]._0 = 5, NewIndices[9]._1 = 6;
+		NewIndices[10]._0 = 6, NewIndices[10]._1 = 7;
+		NewIndices[11]._0 = 7, NewIndices[11]._1 = 4;
+
+		int SizeOfIndices = sizeof(INDEX_MD5_BB)*numIndices;
+
+		VOID* pIndices;
+		if (FAILED(g_pBBIB->Lock(0, SizeOfIndices, (void **)&pIndices, D3DLOCK_NOSYSLOCK | D3DLOCK_DISCARD)))
+			return;
+		memcpy(pIndices, NewIndices, SizeOfIndices);
+		g_pBBIB->Unlock();
+	
+	delete[] NewIndices;
+	NewIndices = NULL;
+
+	D3DDevice->SetVertexDeclaration( g_pVBDeclaration );
+
+	D3DDevice->SetStreamSource( 0, g_pModelVB, 0, sizeof( VERTEX_MD5 ) );
+	D3DDevice->SetStreamSourceFreq( 0, D3DSTREAMSOURCE_INDEXEDDATA | numInstances );
+
+	D3DDevice->SetStreamSource( 1, g_pModelInstanceVB, 0, sizeof( INSTANCE_DATA_MD5 ) );
+	D3DDevice->SetStreamSourceFreq( 1, D3DSTREAMSOURCE_INSTANCEDATA | 1ul );
+
+	D3DDevice->SetIndices( g_pBBIB );
+
+	HLSL->SetTechnique("HLSLStill");
+
+	UINT numPasses = 0;
+	HLSL->Begin(&numPasses, NULL);
+
+		for (UINT i = 0; i < numPasses; ++i)
+		{
+			HLSL->BeginPass(i);
+
+			//HLSL->CommitChanges();
+
+			D3DDevice->DrawIndexedPrimitive(D3DPT_LINELIST, 0, 0, numVertices, 0, numIndices);
+
+			HLSL->EndPass();
+		}
+
+	HLSL->End();
+
+	D3DDevice->SetStreamSourceFreq( 0, 1 );
+	D3DDevice->SetStreamSourceFreq( 1, 1 );
+
+	return;
+}
+
 HRESULT ModelMD5::DrawNormalVecters(LPDIRECT3DDEVICE9 D3DDevice, float LenFactor)
 {
 	int numVertices = numTVertices * 2;
@@ -1430,6 +1611,7 @@ HRESULT ModelMD5::DrawNormalVecters(LPDIRECT3DDEVICE9 D3DDevice, float LenFactor
 		g_pNVVB->Unlock();
 
 	delete[] NewVertices;
+	NewVertices = NULL;
 
 
 	// 색인 버퍼 업데이트!
@@ -1451,6 +1633,7 @@ HRESULT ModelMD5::DrawNormalVecters(LPDIRECT3DDEVICE9 D3DDevice, float LenFactor
 		g_pNVIB->Unlock();
 	
 	delete[] NewIndices;
+	NewIndices = NULL;
 
 	D3DDevice->SetStreamSource(0, g_pNVVB, 0, sizeof(VERTEX_MD5_NORMAL));
 	D3DDevice->SetFVF(D3DFVF_VERTEX_MD5_NORMAL);
