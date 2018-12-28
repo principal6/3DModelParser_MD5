@@ -1,0 +1,14 @@
+#include <d3dx9.h>
+
+extern LPDIRECT3D9				g_pD3D;
+extern LPDIRECT3DDEVICE9		g_pd3dDevice;
+
+extern LPDIRECT3DVERTEXBUFFER9	g_pVB;
+extern LPDIRECT3DINDEXBUFFER9	g_pIB;
+extern LPDIRECT3DTEXTURE9		g_pTexture;
+
+extern LPDIRECT3DVERTEXBUFFER9	g_pModelVB;
+extern LPDIRECT3DINDEXBUFFER9	g_pModelIB;
+extern LPDIRECT3DTEXTURE9		g_pModelTexture;
+
+extern D3DXMATRIXA16			g_pModelMatrix;
