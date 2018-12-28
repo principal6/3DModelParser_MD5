@@ -1,0 +1,21 @@
+﻿빌드 시작: 2018. 02. 02. (금) 오전 12:54:44
+     1>2 노드의 "C:\Users\JesusKim\Desktop\3DModelParser\MD5Parser v8 최적화2\D3D9Game.vcxproj" 프로젝트(build 대상)입니다.
+       프로젝트 파일에 ToolsVersion="14.0"이(가) 들어 있습니다. 이 도구 집합은 알 수 없거나 누락되었을 수 있습니다. 이 경우 적절한 버전의 MSBuild를 설치하여 이 문제를 해결할 수 있습니다. 그렇지 않으면 빌드가 정책상의 이유로 특정 ToolsVersion이 될 수 있습니다. 프로젝트에 ToolsVersion="4.0"이 들어 있는 것으로 간주합니다. 자세한 내용은 http://go.microsoft.com/fwlink/?LinkId=291333을 참조하십시오.
+     1>InitializeBuildStatus:
+         "AlwaysCreate"이(가) 지정되었기 때문에 "Debug\D3D9Game.unsuccessfulbuild"을(를) 만들고 있습니다.
+       ClCompile:
+         모든 출력이 최신 상태입니다.
+       ManifestResourceCompile:
+         모든 출력이 최신 상태입니다.
+       Link:
+         모든 출력이 최신 상태입니다.
+       Manifest:
+         모든 출력이 최신 상태입니다.
+       FinalizeBuildStatus:
+         "Debug\D3D9Game.unsuccessfulbuild" 파일을 삭제하고 있습니다.
+         "Debug\D3D9Game.lastbuildstate"에 연결(touching)하고 있습니다.
+     1>"C:\Users\JesusKim\Desktop\3DModelParser\MD5Parser v8 최적화2\D3D9Game.vcxproj" 프로젝트를 빌드했습니다(build 대상).
+
+빌드했습니다.
+
+경과 시간: 00:00:00.09

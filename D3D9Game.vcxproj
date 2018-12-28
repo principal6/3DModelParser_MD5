@@ -194,6 +194,7 @@
     <ClCompile Include="ModelMD5.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Global.h" />
     <ClInclude Include="ModelMD5.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

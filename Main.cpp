@@ -1,26 +1,39 @@
 #include <windows.h>
-#include <mmsystem.h>
-#pragma warning( disable : 4996 ) // disable deprecated warning 
-#include <strsafe.h>
-#pragma warning( default : 4996 )
 #include "ModelMD5.h"
+
+
+// 상수 선언
+const int				MAX_MODEL_NUM	= 10;
+
 
 // D3D 변수 선언
 LPDIRECT3D9             g_pD3D			= NULL;
 LPDIRECT3DDEVICE9       g_pd3dDevice	= NULL;
 
-D3DXMATRIXA16			matWorld;
+LPDIRECT3DVERTEXBUFFER9	g_pModelVB		= NULL;
+LPDIRECT3DINDEXBUFFER9	g_pModelIB		= NULL;
+
+D3DXMATRIXA16			matModelWorld;
 D3DXMATRIXA16			matView, matProj;
 
+
 // 기타 변수 선언
-ModelMD5				MyMD5Model;
-DWORD					MyTimer			= 0;
+ModelMD5				MyMD5Model[MAX_MODEL_NUM];
+DWORD					SecondTimer		= 0;
 int						FPS				= 0;
+const int				ScreenWidth		= 1024;
+const int				ScreenHeight	= 768;
+
 
 // 함수 원형 선언
 VOID Cleanup();
 HRESULT InitD3D( HWND hWnd );
 HRESULT InitModel();
+VOID SetupCameraMatrices();
+VOID SetupModelMatrix(float Tx, float Ty, float Tz, float Rx, float Ry, float Rz, float Sx, float Sy, float Sz);
+VOID Render();
+LRESULT WINAPI MsgProc( HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam );
+INT WINAPI WinMain( HINSTANCE hInst, HINSTANCE, LPSTR, INT );
 
 
 HRESULT InitD3D( HWND hWnd )
@@ -39,12 +52,10 @@ HRESULT InitD3D( HWND hWnd )
 	if( FAILED( g_pD3D->CreateDevice( D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, hWnd, D3DCREATE_HARDWARE_VERTEXPROCESSING, &d3dpp, &g_pd3dDevice ) ) )
 		return E_FAIL;
 
-	//g_pd3dDevice->SetRenderState( D3DRS_CULLMODE, D3DCULL_CCW );
-	//g_pd3dDevice->SetRenderState( D3DRS_CULLMODE, D3DCULL_CW );
-	g_pd3dDevice->SetRenderState( D3DRS_CULLMODE, D3DCULL_NONE );
+	g_pd3dDevice->SetRenderState( D3DRS_CULLMODE, D3DCULL_CCW );
 	g_pd3dDevice->SetRenderState( D3DRS_LIGHTING, FALSE );
 	g_pd3dDevice->SetRenderState( D3DRS_ZENABLE, TRUE );
-	//g_pd3dDevice->SetRenderState( D3DRS_FILLMODE, D3DFILL_WIREFRAME );
+	g_pd3dDevice->SetRenderState( D3DRS_FILLMODE, D3DFILL_WIREFRAME );
 
 	InitModel();
 
@@ -53,60 +64,47 @@ HRESULT InitD3D( HWND hWnd )
 
 HRESULT InitModel()
 {
-	//MyMD5Model.OpenModelFromFile("GuardStandingIdle.MD5MESH");
-	//MyMD5Model.OpenAnimationFromFile("GuardStandingIdle.MD5ANIM");
-
-	MyMD5Model.OpenModelFromFile("LumberJack.MD5MESH");
-	MyMD5Model.OpenAnimationFromFile("LumberJack.MD5ANIM");
-
-	//MyMD5Model.OpenModelFromFile("Female.MD5MESH");
-	//MyMD5Model.OpenAnimationFromFile("Female.MD5ANIM");
-	//MyMD5Model.ConvertMeshVersion("Female.MD5MESH");
-	//MyMD5Model.ConvertAnimVersion("Female.MD5ANIM");
-
-	//MyMD5Model.OpenModelFromFile("twomeshes.MD5MESH");
-	//MyMD5Model.OpenAnimationFromFile("twomeshes.MD5ANIM");
-
-	MyMD5Model.CreateModel(g_pd3dDevice);
+	MyMD5Model[0].OpenAndCreateAtOnce(g_pd3dDevice, "Model\\", "EzrealWalk");
+	MyMD5Model[1].OpenAndCreateAtOnce(g_pd3dDevice, "Model\\", "EzrealWalk");
+	MyMD5Model[2].OpenAndCreateAtOnce(g_pd3dDevice, "Model\\", "EzrealWalk");
+	MyMD5Model[3].OpenAndCreateAtOnce(g_pd3dDevice, "Model\\", "EzrealWalk");
 
 	return S_OK;
 }
 
-VOID SetupMatrices()
+VOID SetupCameraMatrices()
 {
-	D3DXMatrixIdentity( &matWorld );
-
+	// 뷰 행렬(카메라 설정)
 	D3DXVECTOR3 vEyePt( -5.0f, 4.0f, -5.0f );
 	D3DXVECTOR3 vLookatPt( 0.0f, 0.0f, 0.0f );
 	D3DXVECTOR3 vUpVec( 0.0f, 1.0f, 0.0f );
-
 	D3DXMatrixLookAtLH( &matView, &vEyePt, &vLookatPt, &vUpVec );
 	g_pd3dDevice->SetTransform( D3DTS_VIEW, &matView );
-
+	
+	// 투영 행렬(원근감 설정)
 	D3DXMatrixPerspectiveFovLH( &matProj, D3DX_PI/4, 1.0f, 1.0f, 100.0f );
 	g_pd3dDevice->SetTransform( D3DTS_PROJECTION, &matProj );
+}
 
+VOID SetupModelMatrix(float Tx, float Ty, float Tz, float Rx, float Ry, float Rz, float Sx, float Sy, float Sz)
+{
+	// 월드 행렬(위치, 회전, 크기 설정)
+	D3DXMatrixIdentity( &matModelWorld );
 
-	D3DXMATRIXA16 matTrans;
-	D3DXMATRIXA16 matRot;
-	D3DXMATRIXA16 matSize;
+		D3DXMATRIXA16 matTrans;
+		D3DXMATRIXA16 matRotX;
+		D3DXMATRIXA16 matRotY;
+		D3DXMATRIXA16 matRotZ;
+		D3DXMATRIXA16 matSize;
 
-	D3DXMatrixTranslation(&matTrans, 0.0f, 0.0f, 0.0f);
-	//D3DXMatrixTranslation(&matTrans, 0.0f, -40.0f, 0.0f);
-	FLOAT fAngle = 0.0f;
-	//fAngle = timeGetTime() / 1000.0f;
-	//fAngle = D3DX_PI;							// 90도 = D3DX_PI * 3 / 4
-	D3DXMatrixRotationY(&matRot, fAngle);		// Y축을 기준으로 회전 (즉, X&Z가 회전함)
-	
-	//D3DXMatrixScaling(&matSize, 0.005f, 0.005f, 0.005f);
-	//D3DXMatrixScaling(&matSize, 0.02f, 0.02f, 0.02f);
-	//D3DXMatrixScaling(&matSize, 0.04f, 0.04f, 0.04f);
-	//D3DXMatrixScaling(&matSize, 0.08f, 0.08f, 0.08f);
-	D3DXMatrixScaling(&matSize, 1.0f, 1.0f, 1.0f);
+		D3DXMatrixTranslation(&matTrans, Tx, Ty, Tz);
+		D3DXMatrixRotationX(&matRotX, Rx);
+		D3DXMatrixRotationY(&matRotY, Ry);				// Y축을 기준으로 회전 (즉, X&Z가 회전함)
+		D3DXMatrixRotationZ(&matRotZ, Rz);
+		D3DXMatrixScaling(&matSize, Sx, Sy, Sz);
 
-	matWorld = matWorld * matTrans * matRot * matSize;
-
-	g_pd3dDevice->SetTransform(D3DTS_WORLD, &matWorld);
+	matModelWorld = matModelWorld * matTrans * matRotX * matRotY * matRotZ * matSize;
+	g_pd3dDevice->SetTransform(D3DTS_WORLD, &matModelWorld);
 }
 
 VOID Render()
@@ -116,10 +114,23 @@ VOID Render()
 
 	if( SUCCEEDED( g_pd3dDevice->BeginScene() ) )
 	{
-		SetupMatrices();
+		SetupCameraMatrices();
 
-		MyMD5Model.Animate(0.02f);
-		MyMD5Model.DrawModel(g_pd3dDevice);
+		SetupModelMatrix(0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.02f, 0.02f, 0.02f);
+		MyMD5Model[0].Animate(0.01f);
+		MyMD5Model[0].DrawModel(g_pd3dDevice);
+
+		SetupModelMatrix(40.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.02f, 0.02f, 0.02f);
+		MyMD5Model[1].Animate(0.01f);
+		MyMD5Model[1].DrawModel(g_pd3dDevice);
+
+		SetupModelMatrix(-40.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.02f, 0.02f, 0.02f);
+		MyMD5Model[2].Animate(0.01f);
+		MyMD5Model[2].DrawModel(g_pd3dDevice);
+
+		SetupModelMatrix(-80.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.02f, 0.02f, 0.02f);
+		MyMD5Model[3].Animate(0.01f);
+		MyMD5Model[3].DrawModel(g_pd3dDevice);
 
 		g_pd3dDevice->EndScene();
 	}
@@ -132,10 +143,10 @@ LRESULT WINAPI MsgProc( HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam )
 {
 	switch( msg )
 	{
-	case WM_DESTROY:
-		Cleanup();
-		PostQuitMessage( 0 );
-		return 0;
+		case WM_DESTROY:
+			Cleanup();
+			PostQuitMessage( 0 );
+			return 0;
 	}
 
 	return DefWindowProc( hWnd, msg, wParam, lParam );
@@ -147,37 +158,37 @@ INT WINAPI WinMain( HINSTANCE hInst, HINSTANCE, LPSTR, INT )
 	WNDCLASSEX wc = { sizeof(WNDCLASSEX), CS_CLASSDC, MsgProc, 0L, 0L, GetModuleHandle(NULL), NULL, NULL, NULL, NULL, "D3DGAME", NULL };
 	RegisterClassEx( &wc );
 
-	HWND hWnd = CreateWindow( "D3DGAME", "GAME", WS_OVERLAPPEDWINDOW, 0, 0, 800, 600, NULL, NULL, wc.hInstance, NULL );
+	HWND hWnd = CreateWindow( "D3DGAME", "GAME", WS_OVERLAPPEDWINDOW, 0, 0, ScreenWidth, ScreenHeight, NULL, NULL, wc.hInstance, NULL );
 
-	if( SUCCEEDED( InitD3D( hWnd ) ) )
+	if( FAILED( InitD3D( hWnd ) ) )
+		return 0;
+
+	ShowWindow(hWnd, SW_SHOWDEFAULT);
+	UpdateWindow(hWnd);
+
+	MSG msg;
+	ZeroMemory(&msg, sizeof(msg));
+	while (msg.message != WM_QUIT)
 	{
-		ShowWindow(hWnd, SW_SHOWDEFAULT);
-		UpdateWindow(hWnd);
-
-		MSG msg;
-		ZeroMemory(&msg, sizeof(msg));
-		while (msg.message != WM_QUIT)
+		if (PeekMessage(&msg, NULL, 0U, 0U, PM_REMOVE))
 		{
-			if (PeekMessage(&msg, NULL, 0U, 0U, PM_REMOVE))
+			TranslateMessage(&msg);
+			DispatchMessage(&msg);
+		}
+		else
+		{
+			FPS++;
+			Render();
+
+			if (GetTickCount() >= SecondTimer + 1000)	// 초시계
 			{
-				TranslateMessage(&msg);
-				DispatchMessage(&msg);
-			}
-			else
-			{
-				FPS++;
-				Render();
+				SecondTimer = GetTickCount();
 
-				if (timeGetTime() >= MyTimer + 1000)	// 게임 타이머!★★
-				{
-					MyTimer = timeGetTime();
+				char temp[20];
+				_itoa_s(FPS, temp, 10);
+				SetWindowText(hWnd, temp);
 
-					char temp[20];
-					_itoa_s(FPS, temp, 10);
-					SetWindowText(hWnd, temp);
-
-					FPS = 0;
-				}
+				FPS = 0;
 			}
 		}
 	}
@@ -188,8 +199,17 @@ INT WINAPI WinMain( HINSTANCE hInst, HINSTANCE, LPSTR, INT )
 
 VOID Cleanup()
 {
-	MyMD5Model.Destroy();
+	for (int i = 0; i < MAX_MODEL_NUM; i++)
+	{
+		MyMD5Model[i].Destroy();
+	}
 
+	if( g_pModelVB != NULL )
+		g_pModelVB->Release();
+
+	if( g_pModelIB != NULL )
+		g_pModelIB->Release();
+		
 	if( g_pd3dDevice != NULL )
 		g_pd3dDevice->Release();
 
